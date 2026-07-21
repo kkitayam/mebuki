@@ -1,0 +1,19 @@
+cpu: CPU.CortexM @ sysbus
+    cpuType: "cortex-m4f"
+    nvic: nvic
+    PerformanceInMips: 96
+
+nvic: IRQControllers.NVIC @ sysbus 0xE000E000
+    priorityMask: 0xF0
+    systickFrequency: 32000000
+    IRQ -> cpu@0
+
+flash: Memory.MappedMemory @ sysbus 0x00000000
+    size: 0x100000
+    ResetByte: 0xFF
+
+sram: Memory.MappedMemory @ sysbus 0x20000000
+    size: 0x20000
+
+uart0: UART.PL011 @ sysbus 0x4001C000
+    -> nvic@6

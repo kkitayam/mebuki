@@ -1,0 +1,6 @@
+[wrap-git]
+directory = c-fn-dsa
+url = https://github.com/pornin/c-fn-dsa.git
+revision = HEAD
+depth = 1
+patch_directory = c-fn-dsa

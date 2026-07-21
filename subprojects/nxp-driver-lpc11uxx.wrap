@@ -1,0 +1,7 @@
+[wrap-git]
+directory = nxp-driver-lpc11uxx
+url = https://github.com/kkitayam/nxp_driver.git
+revision = aaca31422c522f18298cfd72f8e02ccf10100248
+depth = 1
+patch_directory = nxp-driver-lpc11uxx
+

@@ -1,0 +1,10 @@
+emulation SetGlobalAdvanceImmediately true
+
+mach create
+machine LoadPlatformDescription @platform.repl
+cpu FpuEnabled true
+sysbus LoadELF @boot.elf
+@LOAD_APP_LINES@
+machine StartGdbServer @GDB_PORT@
+showAnalyzer sysbus.uart0
+cpu EnableProfiler CollapsedStack @./perf.dat true

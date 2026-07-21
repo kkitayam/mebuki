@@ -1,0 +1,10 @@
+emulation SetGlobalAdvanceImmediately true
+
+mach create
+machine LoadPlatformDescription @targets/cm4/renode/platform.repl
+sysbus LoadELF @build_cm4/targets/cm4/boot.elf
+sysbus LoadBinary @build_cm4/targets/cm4/app.v0.k0.img 0x20000
+
+machine StartGdbServer 3333
+showAnalyzer sysbus.uart0
+

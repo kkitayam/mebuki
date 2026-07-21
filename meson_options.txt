@@ -1,0 +1,12 @@
+option('target',
+  type: 'combo',
+  choices: ['all', 'cm4', 'ae_lpc11u35_mb'],
+  value: 'all',
+  description: 'Target platform to build (all, cm4, ae_lpc11u35_mb, ...)',
+)
+option('svl',
+  type: 'combo',
+  choices: ['fndsa', 'ecdsa-p256-sha256'],
+  value: 'fndsa',
+  description: 'Signature Verification Layer'
+)
