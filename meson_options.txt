@@ -1,8 +1,8 @@
 option('target',
   type: 'combo',
-  choices: ['all', 'cm4', 'ae_lpc11u35_mb'],
+  choices: ['all', 'renode-cm4', 'cm4'],
   value: 'all',
-  description: 'Target platform to build (all, cm4, ae_lpc11u35_mb, ...)',
+  description: 'Target machine to build (all, renode-cm4)',
 )
 option('svl',
   type: 'combo',

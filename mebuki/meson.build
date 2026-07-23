@@ -10,6 +10,4 @@ mebuki_dep = declare_dependency(
   include_directories: mbk_includes,
 )
 
-if meson.is_subproject()
-  meson.override_dependency('mebuki', mebuki_dep)
-endif
+meson.override_dependency('mebuki', mebuki_dep)

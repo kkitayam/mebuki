@@ -12,6 +12,7 @@ subdir('verification')
 
 if not meson.is_subproject()
   if build_examples
+    subdir('machines')
     subdir('examples')
   endif
   if build_tests

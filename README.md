@@ -76,7 +76,9 @@ mebuki/
 │   ├── ecdsa-p256-sha256/
 │   └── fndsa/
 │
-├── examples/           Reference applications
+├── machines/           Target machine implementations (startup/linker/HAL/runner)
+├── cross/              Meson cross files
+├── examples/           Reference boot/app and use case definitions
 ├── tests/              Unit tests
 ├── docs/               Documentation
 ├── vendor/             Bundled third-party source code

@@ -3,14 +3,16 @@ if not sign_algorithms.has_key(verification)
   error('Unsupported SVL: @0@'.format(verification))
 endif
 
+if machine_name != 'renode-cm4'
+  error('Unsupported machine for examples: @0@'.format(machine_name))
+endif
+
+mebuki_sign = find_program('mebuki-sign', required: true)
+
 generations = 8
 app_security_versions = [0, 1, 2]
 app_key_generations = range(generations)
-
-mebuki_sign = find_program('mebuki-sign', required: false)
-if not mebuki_sign.found()
-  mebuki_sign = find_program(meson.project_source_root() / 'tools' / 'mebuki-sign.bat', required: true)
-endif
+examples_build_dir = meson.current_build_dir()
 
 public_keys_file = 'public_keys.h'
 private_key_files = []
@@ -32,7 +34,14 @@ gen_keys = custom_target(
   env: {
     'PYTHONUTF8': '1',
   },
-  build_by_default: false
 )
+public_keys = gen_keys[0]
+private_keys = []
+foreach i : range(generations)
+  private_keys += gen_keys[i + 1]
+endforeach
+sign_algo = sign_algorithms[verification]
 
-subdir('targets')
+subdir('boot')
+subdir('app')
+subdir('usecases')
