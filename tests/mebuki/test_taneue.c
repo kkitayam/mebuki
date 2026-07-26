@@ -1,7 +1,5 @@
-/**
- * @file test_taneue.c
- * @brief taneue unit tests
- */
+/* SPDX-License-Identifier: Apache-2.0 */
+/* Copyright (c) 2026 Koji KITAYAMA */
 
 #include "unity.h"
 #include "mock_hal_flash.h"

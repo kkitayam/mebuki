@@ -309,7 +309,7 @@ STATIC bool sml_prefer_slot1(const struct mbk_header* slot0, const struct mbk_he
 
 STATIC bool sml_is_slot_header_valid(const struct mbk_header* header)
 {
-    /* security_version / key_generation は BEL が判定する */
+    /* BEL validates security_version and key_generation, so SML only checks other fields */
     if (header->invalidation_flag != MBK_INVALIDATION_FLAG_VALID) return false;
     if (header->software_size == 0) return false;
     if (header->software_size > MBK_SOFTWARE_SIZE_MAX) return false;
@@ -384,7 +384,7 @@ STATIC int bfl_store_entry(struct mbk_bfl_entry* inout)
         return MBK_BFL_ERROR_INTEGRITY_MISMATCH;
     }
 
-    /* Flash 成功まで呼び出し側 RAM 状態は変更しない */
+    /* Keep caller side RAM state until flash operation succeeds */
     struct mbk_bfl_entry next = *inout;
     next.remaining_stores = rem - 1U;
     next.integrity = bfl_compute_record_integrity(&next);

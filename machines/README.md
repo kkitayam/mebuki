@@ -1,17 +1,17 @@
 # Machines
 
-このディレクトリには、実行環境（Machine）実装を配置します。
+This directory contains the implementations of execution environments (Machines).
 
-## 利用可能な Machine
+## Supported Machines
 
-- `renode-cm4`: Renode 上で動作する Cortex-M4 参照環境
+- `renode-cm4`: Reference environment running on Renode for Cortex-M4
 
-## 含める責務
+## Responsibilities of the Machine
 
 - `hal/`: UART, flash, system, retarget
-- `config/`: メモリマップと mebuki 設定
-- `startup_boot.s` / `startup_app.s`: 起動コード
-- `linker_boot.ld` / `linker_app.ld`: リンカスクリプト
-- `renode/`: 実行環境設定
+- `config/`: Memory map and mebuki configuration
+- `startup_boot.s` / `startup_app.s`: Startup code
+- `linker_boot.ld` / `linker_app.ld`: Linker script
+- `renode/`: Environment configuration
 
-Use Case は `examples/usecases/` 側で定義し、Machine 側には保持しません。
+Use Case is defined on the `examples/usecases/` side and is not retained on the Machine side.

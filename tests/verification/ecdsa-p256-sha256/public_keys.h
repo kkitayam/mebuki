@@ -1,3 +1,6 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/* Copyright (c) 2026 Koji KITAYAMA */
+
 #ifndef PUBLIC_KEYS_H
 #define PUBLIC_KEYS_H
 

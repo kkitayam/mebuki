@@ -1,43 +1,41 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/* Copyright (c) 2026 Koji KITAYAMA */
+
 #ifndef UART_H
 #define UART_H
 
 #include <stddef.h>
 
-/**
- * @file uart.h
- * @brief UART (PL011) ハードウェア抽象化層
+/*
+ * UART (PL011) Hardware Abstraction Layer
  *
- * PL011 UART の送信機能を提供
- * - ポーリング方式のみ（割り込み禁止）
- * - 受信機能は未実装
+ * Provides transmission functionality for the PL011 UART
+ * - Polling only (interrupts disabled)
+ * - Reception functionality is not implemented
  */
 
-/**
- * @brief UART0 初期化
+/*
+ * UART0 initialization
  *
- * PL011 UART0 を初期化し、送信可能な状態にする
- * - ボーレート: 115200 bps
- * - データビット: 8
- * - ストップビット: 1
- * - パリティ: なし
+ * Initialize PL011 UART0 and make it ready for transmission
+ * - Baud rate: 115200 bps
+ * - Data bits: 8
+ * - Stop bits: 1
+ * - Parity: none
  */
 void uart_init(void);
 
-/**
- * @brief 1文字送信 (ポーリング)
+/*
+ * Send a single character (polling)
  *
- * @param c 送信する文字
- *
- * TX FIFO に空きが出るまで待機してから送信
+ * Wait until there is space in the TX FIFO before sending
  */
 void uart_putc(char c);
 
-/**
- * @brief 文字列送信
+/*
+ * Send a string (polling)
  *
- * @param str 送信する NUL 終端文字列
- *
- * 文字列を最後の NUL まで送信
+  * Sends the string up to the terminating NUL character
  */
 void uart_puts(const char* str);
 

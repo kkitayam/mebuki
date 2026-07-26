@@ -1,3 +1,6 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/* Copyright (c) 2026 Koji KITAYAMA */
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <errno.h>
@@ -27,7 +30,7 @@ int _isatty_r(struct _reent *r, int fd)
 {
     (void)fd;
     r->_errno = EBADF;
-    return 0; /* isatty は「偽」を 0 で返すのが自然 */
+    return 0; /* isatty naturally returns 0 for "false" */
 }
 
 /* lseek */
@@ -55,7 +58,7 @@ ssize_t _write_r(struct _reent *r, int fd, const void *buf, size_t cnt)
 {
     (void)r;
 
-    /* stdout / stderr のみ受け付けるのが一般的 */
+    /* Typically only accept stdout / stderr */
     if (fd != STDOUT_FILENO && fd != STDERR_FILENO) {
         r->_errno = EBADF;
         return -1;
@@ -63,7 +66,7 @@ ssize_t _write_r(struct _reent *r, int fd, const void *buf, size_t cnt)
 
     const char *p = (const char *)buf;
     for (size_t i = 0; i < cnt; i++) {
-        /* 改行補正（任意） */
+        /* convert newline to carriage return (optional) */
         if (p[i] == '\n') {
             uart_putc('\r');
         }

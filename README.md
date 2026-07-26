@@ -1,8 +1,8 @@
 # mebuki
 
-A lightweight secure boot library for single-core MCUs with built-in support for **Post-Quantum Cryptography (PQC)**.
+A lightweight secure boot library for resource-constrained MCUs with native support for **Post-Quantum Cryptography (PQC)**.
 
-Mebuki focuses exclusively on the core responsibilities of secure boot—firmware authentication, rollback protection, verification key management, and persistent security state management. Its modular architecture separates secure boot logic from cryptographic implementations, allowing signature algorithms to evolve independently without changing the boot flow.
+Mebuki focuses exclusively on the core responsibilities of secure boot -- firmware authentication, rollback protection, verification key management, and persistent security state management. Its modular architecture separates secure boot logic from cryptographic implementations, allowing signature algorithms to evolve independently without changing the boot flow.
 
 Unlike complete firmware update frameworks, Mebuki intentionally leaves firmware download, image storage, and flash programming under application control, providing only the secure boot functionality required to verify and activate trusted firmware.
 
@@ -22,7 +22,7 @@ Unlike complete firmware update frameworks, Mebuki intentionally leaves firmware
 
 Verifies firmware authenticity and integrity using digital signatures.
 
-Supports **ECDSA-P256-SHA256** and the post-quantum signature scheme **FN-DSA** (FIPS 206). The verification algorithm is selected at build time to balance security, performance, and code size.
+Supports **ECDSA-P256-SHA256** and the post-quantum signature scheme **FN-DSA-512** (FIPS 206). The verification algorithm is selected at build time to balance security, performance, and code size.
 
 #### Rollback Protection
 
@@ -38,7 +38,7 @@ When firmware signed with the next (or any subsequent) verification key is succe
 
 #### Power-loss Resilient Security State Management
 
-Maintains the integrity of the persistent security state—including the Security Version and active verification key—across unexpected power loss using redundant boot history records.
+Maintains the integrity of the persistent security state -- including the Security Version and active verification key -- across unexpected power loss using redundant boot history records.
 
 ### Update Support
 
@@ -62,7 +62,7 @@ The reference example requires a firmware image signed with **mebuki-sign**.
 
 Generate a signed firmware image using `mebuki-sign`, then run the reference example.
 
-For the complete workflow—including key generation, firmware signing, image creation, and execution—see the **Getting Started** guide in `docs/`.
+For the complete workflow -- including key generation, firmware signing, image creation, and execution -- see the **Getting Started** guide in `docs/`.
 
 ## Repository Layout
 
@@ -93,7 +93,7 @@ Mebuki is designed for resource-constrained embedded systems.
 
 ### Requirements
 
-- Single-core MCU
+- Resource-constrained MCU
 - C99 compiler
 - Little-endian architecture
 - Execute-in-Place (XiP) NOR Flash
@@ -117,7 +117,7 @@ Mebuki delegates cryptographic operations to dedicated external libraries rather
 | Verification Algorithm | Library |
 | ---------------------- | ------- |
 | **ECDSA-P256-SHA256** | BearSSL by Thomas Pornin |
-| **FN-DSA** | c-fn-dsa by Thomas Pornin |
+| **FN-DSA-512** | c-fn-dsa by Thomas Pornin |
 
 This separation keeps the secure boot framework compact, maintainable, and easy to audit while allowing cryptographic implementations to evolve independently.
 
@@ -137,7 +137,7 @@ Mebuki is a personal open-source project developed with an emphasis on simplicit
 
 Although designed with production-quality engineering principles, it has not yet reached the maturity or ecosystem of long-established secure boot projects.
 
-For commercial products or long-term maintained platforms, consider evaluating established solutions such as **MCUboot** alongside Mebuki to determine the best fit for your requirements.
+For commercial products or long-term maintained platforms, consider evaluating established solutions such as [MCUboot](https://github.com/mcu-tools/mcuboot) alongside Mebuki to determine the best fit for your requirements.
 
 ## License
 

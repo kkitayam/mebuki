@@ -47,9 +47,3 @@ Public keys should be generated using mebuki-sign. The `public_keys.h` array is 
 
 - Array dimensions match configuration: `[MBK_SVL_NUM_KEY_GENERATIONS][MBK_SVL_PUBKEY_SIZE]`
 - Each element is exactly `MBK_SVL_PUBKEY_SIZE` bytes (897 bytes for FN-DSA-512)
-
------------
-
-開発方針
-c-fn-dsa を submodule として利用
-blake2 を mebuki-svl-monocypher と同様に, コピーして利用。コピーには tools/udpate_blake2.py を利用する。

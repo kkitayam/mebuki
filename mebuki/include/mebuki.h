@@ -49,19 +49,19 @@ enum mbk_result {
  * Firmware image header.
  */
 struct mbk_header {
-    uint16_t security_version;  // 0..MBK_SECURITY_VERSION_MAX
-    uint8_t  key_generation;    // 0..MBK_NUM_KEY_GENERATIONS-1
-    uint8_t  invalidation_flag; // 0xFF = valid, 0x00 = invalid
-    uint32_t software_size;     // Size of the software image in bytes (excluding header and signature)
+    uint16_t security_version;  /* 0..MBK_SECURITY_VERSION_MAX */
+    uint8_t  key_generation;    /* 0..MBK_NUM_KEY_GENERATIONS-1 */
+    uint8_t  invalidation_flag; /* 0xFF = valid, 0x00 = invalid */
+    uint32_t software_size;     /* Size of the software image in bytes (excluding header and signature) */
 };
 
 /*
  * Boot information returned by mbk_find_bootable_slot().
  */
 struct mbk_boot_info {
-    int slot_id;                      // 0 for Slot 0, 1 for Slot 1
-    const struct mbk_header* header;  // Pointer to the firmware header in the selected slot
-    uint32_t entry_point;             // Entry point address of the selected firmware image
+    int slot_id;                      /* 0 for Slot 0, 1 for Slot 1 */
+    const struct mbk_header* header;  /* Pointer to the firmware header in the selected slot */
+    uint32_t entry_point;             /* Entry point address of the selected firmware image */
 };
 
 /* =========================================================================

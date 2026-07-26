@@ -1,7 +1,5 @@
-/**
- * @file test_svl.c
- * @brief Unit tests for SVL ECDSA P-256 + SHA-256 implementation
- */
+/* SPDX-License-Identifier: Apache-2.0 */
+/* Copyright (c) 2026 Koji KITAYAMA */
 
 #include "unity.h"
 #include "mebuki_svl.h"

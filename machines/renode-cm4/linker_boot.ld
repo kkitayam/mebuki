@@ -1,8 +1,5 @@
 /**
- * @file linker_boot.ld
- * @brief Boot Software 用リンカスクリプト
- *
- * メモリレイアウト:
+ * Memory layout:
  * - Flash: 0x00000000 - 0x00020000 (128KB, Boot)
  * - SRAM:  0x20000000 - 0x20020000 (128KB)
  */
@@ -15,7 +12,7 @@ MEMORY
 
 SECTIONS
 {
-    /* ISR ベクタテーブル */
+    /* ISR vector table */
     .isr_vector :
     {
         . = ALIGN(4);
@@ -23,7 +20,7 @@ SECTIONS
         . = ALIGN(4);
     } > FLASH
 
-    /* コード */
+    /* code */
     .text :
     {
         . = ALIGN(4);
@@ -32,7 +29,7 @@ SECTIONS
         . = ALIGN(4);
     } > FLASH
 
-    /* ARM exception unwinding table (出力不要だが含める) */
+    /* ARM exception unwinding table (not required in output but included) */
     .ARM.exidx :
     {
         . = ALIGN(4);
@@ -40,7 +37,7 @@ SECTIONS
         . = ALIGN(4);
     } > FLASH
 
-    /* 未初期化データ */
+    /* Uninitialized data */
     .bss :
     {
         . = ALIGN(4);
@@ -54,7 +51,7 @@ SECTIONS
     .stack (NOLOAD) :
     {
         . = ALIGN(4);
-        . += 0x2000;    /* 8KB スタック */
+        . += 0x2000;    /* 8KB stack */
         __stack_end = .;
     } > SRAM
 }

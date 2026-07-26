@@ -1,11 +1,5 @@
-/**
- * @file startup.s
- * @brief Cortex-M4 スタートアップコード
- *
- * - ベクタテーブル定義
- * - スタックポインタ初期化
- * - main() 関数へジャンプ
- */
+/* SPDX-License-Identifier: Apache-2.0 */
+/* Copyright (c) 2026 Koji KITAYAMA */
 
     .syntax unified
     .cpu cortex-m4
@@ -15,13 +9,9 @@
     .align 2
     .globl __isr_vector
 __isr_vector:
-    /* スタックポインタ初期値 */
-    .long   0x20020000                          /* SRAM end (128KB) */
-
-    /* リセットハンドラ */
+    .long   0x20020000                          /* Initial stack pointer (SRAM end, 128KB) */
     .long   reset_handler
-    
-    /* Cortex-M4 ハンドラ (使用しない) */
+    /* Exception handlers (Cortex-M4 handlers, not used) */
     .long   0                                   /* NMI */
     .long   0                                   /* HardFault */
     .long   0                                   /* MemManage */
@@ -37,18 +27,18 @@ __isr_vector:
     .long   0                                   /* PendSV */
     .long   0                                   /* SysTick */
 
-    /* IRQ ハンドラ (Renode では使用しない) */
-    .long   0                                   /* IRQ0-239 用スペース */
+    /* IRQ handlers (not used in Renode) */
+    .long   0                                   /* IRQ0-239 space */
 
     .text
     .align 2
     .globl reset_handler
     .thumb_func
 reset_handler:
-    /* メインプログラムへジャンプ */
+    /* Jump to the main program */
     bl      main
 
-    /* main() が戻ってきた場合 */
+    /* If main() returns */
     b       .
 
     .end

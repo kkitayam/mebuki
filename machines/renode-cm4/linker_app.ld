@@ -1,10 +1,9 @@
-/**
- * @file linker_app.ld
- * @brief ユーザアプリケーション用リンカスクリプト
+/*
+ * linker script for a user application software
  *
- * mebuki image header が8バイトあるので、 0x20008 から開始
+ * mebuki image header is 8 bytes, so start at 0x20008
  *
- * メモリレイアウト:
+ * memory layout:
  * - Flash: 0x00020008 - 0x00040000 (128KB, Slot 0)
  * - SRAM:  0x20000000 - 0x20020000 (128KB)
  */
@@ -17,7 +16,7 @@ MEMORY
 
 SECTIONS
 {
-    /* ISR ベクタテーブル (オプション: ユーザアプリが定義する場合) */
+    /* ISR vector table (optional: defined by the user application) */
     .isr_vector :
     {
         . = ALIGN(4);
@@ -25,7 +24,7 @@ SECTIONS
         . = ALIGN(4);
     } > FLASH
 
-    /* コード */
+    /* code */
     .text :
     {
         . = ALIGN(4);
@@ -42,7 +41,7 @@ SECTIONS
         . = ALIGN(4);
     } > FLASH
 
-    /* 初期化データ */
+    /* Initialized data */
     .data :
     {
         . = ALIGN(4);
@@ -54,7 +53,7 @@ SECTIONS
 
     __data_rom_start = LOADADDR(.data);
 
-    /* 未初期化データ */
+    /* Uninitialized data */
     .bss :
     {
         . = ALIGN(4);
@@ -65,19 +64,19 @@ SECTIONS
         __bss_end = .;
     } > SRAM
 
-    /* ヒープとスタック */
+    /* Heap and stack */
     .heap (NOLOAD) :
     {
         . = ALIGN(4);
         __heap_start = .;
-        . += 0x1000;    /* 4KB ヒープ */
+        . += 0x1000;    /* 4KB heap */
         __heap_end = .;
     } > SRAM
 
     .stack (NOLOAD) :
     {
         . = ALIGN(4);
-        . += 0x2000;    /* 8KB スタック */
+        . += 0x2000;    /* 8KB stack */
         __stack_end = .;
     } > SRAM
 }

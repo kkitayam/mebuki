@@ -1,9 +1,5 @@
-/**
- * @file test_bsl.c
- * @brief BSL (Boot Sequence Layer) Integration Tests
- *
- * 起動シーケンス統合テスト
- */
+/* SPDX-License-Identifier: Apache-2.0 */
+/* Copyright (c) 2026 Koji KITAYAMA */
 
 #include "unity.h"
 #include "mock_hal_flash.h"
@@ -23,20 +19,25 @@ void tearDown(void)
 {
 }
 
-/* ヘッダ設定ヘルパー */
 static void setup_slot_header(uintptr_t slot_addr, uint16_t sec_ver, uint8_t key_gen, uint32_t sw_size)
 {
     uint8_t header[MBK_HEADER_SIZE];
     header[0] = (sec_ver >> 0) & 0xFF;
     header[1] = (sec_ver >> 8) & 0xFF;
     header[2] = key_gen;
-    header[3] = 0xFF;  // invalidation_flag=valid
+    header[3] = 0xFF;  /* invalidation_flag=valid */
     header[4] = (sw_size >>  0) & 0xFF;
     header[5] = (sw_size >>  8) & 0xFF;
     header[6] = (sw_size >> 16) & 0xFF;
     header[7] = (sw_size >> 24) & 0xFF;
 
     hal_flash_write(slot_addr, header, MBK_HEADER_SIZE);
+}
+
+static void invalidate_slot(uintptr_t slot_addr)
+{
+    uint8_t flag = 0x00;  /* invalidation_flag=invalid */
+    hal_flash_write(slot_addr + 3, &flag, 1);
 }
 
 static void erase_slot_region(uintptr_t slot_addr)
@@ -71,7 +72,7 @@ static void setup_slot_image(uintptr_t slot_addr, uint16_t sec_ver, uint8_t key_
 }
 
 /* ============================================================
- * 初期化テスト
+ * initialization tests
  * ============================================================ */
 
 void test_bsl_init_success(void)
@@ -84,14 +85,14 @@ void test_bsl_init_success(void)
 void test_bsl_init_empty_flash(void)
 {
     struct mbk_context ctx;
-    // 空のFlashでも初期化成功（初回起動）
+    /* Initialization succeeds even with empty Flash (first boot) */
     hal_flash_erase_all();
     enum mbk_result result = mbk_init(&ctx);
     TEST_ASSERT_EQUAL(MBK_SUCCESS, result);
 }
 
 /* ============================================================
- * スロット検索テスト
+ * slot search tests
  * ============================================================ */
 
 void test_bsl_find_bootable_slot_null_param(void)
@@ -105,8 +106,8 @@ void test_bsl_find_bootable_slot_null_param(void)
 void test_bsl_find_bootable_slot_both_invalid(void)
 {
     struct mbk_context ctx;
-    // 両スロット無効（初期化前に設定）
-    setup_slot_header(MBK_SLOT0_BASE, 100, 0, 0);  // software_size=0で無効
+    /* Both slots are invalid (initial setup) */
+    setup_slot_header(MBK_SLOT0_BASE, 100, 0, 0);  /* invalid by software_size=0 */
     setup_slot_header(MBK_SLOT1_BASE, 100, 0, 0);
 
     mbk_init(&ctx);
@@ -119,9 +120,9 @@ void test_bsl_find_bootable_slot_both_invalid(void)
 void test_bsl_find_bootable_slot_single_valid(void)
 {
     struct mbk_context ctx;
-    // Slot 0のみ有効（初期化前に設定）
+    /* Slot 0 only is valid (initial setup) */
     setup_slot_header(MBK_SLOT0_BASE, 100, 0, 1024);
-    setup_slot_header(MBK_SLOT1_BASE, 100, 0, 0);  // 無効
+    setup_slot_header(MBK_SLOT1_BASE, 100, 0, 0);  /* invalid */
 
     mbk_init(&ctx);
     mock_svl_set_verification_result(true);
@@ -138,7 +139,7 @@ void test_bsl_find_bootable_slot_single_valid(void)
 void test_bsl_find_bootable_slot_priority_slot0(void)
 {
     struct mbk_context ctx;
-    // Slot 0の方がバージョン高い（初期化前に設定）
+    /* Slot 0 is higher version (initial setup) */
     setup_slot_header(MBK_SLOT0_BASE, 200, 0, 1024);
     setup_slot_header(MBK_SLOT1_BASE, 100, 0, 1024);
 
@@ -155,7 +156,7 @@ void test_bsl_find_bootable_slot_priority_slot0(void)
 void test_bsl_find_bootable_slot_priority_slot1(void)
 {
     struct mbk_context ctx;
-    // Slot 1の方がバージョン高い（初期化前に設定）
+    /* Slot 1 is higher version (initial setup) */
     setup_slot_header(MBK_SLOT0_BASE, 100, 0, 1024);
     setup_slot_header(MBK_SLOT1_BASE, 200, 0, 1024);
 
@@ -173,10 +174,10 @@ void test_bsl_find_bootable_slot_signature_verification_failed(void)
 {
     struct mbk_context ctx;
     setup_slot_header(MBK_SLOT0_BASE, 100, 0, 1024);
-    setup_slot_header(MBK_SLOT1_BASE, 100, 0, 0);  // 無効
+    setup_slot_header(MBK_SLOT1_BASE, 100, 0, 0);  /* invalid */
 
     mbk_init(&ctx);
-    mock_svl_set_verification_result(false);  // 署名検証失敗
+    mock_svl_set_verification_result(false);  /* fail signature verification */
 
     struct mbk_boot_info boot_info;
     enum mbk_result result = mbk_find_bootable_slot(&ctx, &boot_info);
@@ -187,8 +188,8 @@ void test_bsl_find_bootable_slot_signature_verification_failed(void)
 void test_bsl_find_bootable_slot_fallback_to_slot1(void)
 {
     struct mbk_context ctx;
-    // Slot 0無効、Slot 1のみ有効
-    setup_slot_header(MBK_SLOT0_BASE, 200, 0, 0);  // 無効
+    /* Slot 0 invalid, Slot 1 only valid */
+    setup_slot_header(MBK_SLOT0_BASE, 200, 0, 0);  /* invalid */
     setup_slot_header(MBK_SLOT1_BASE, 100, 0, 1024);
 
     mbk_init(&ctx);
@@ -202,49 +203,111 @@ void test_bsl_find_bootable_slot_fallback_to_slot1(void)
 }
 
 /* ============================================================
- * ロールバック対策テスト
+ * Rollback protection tests
  * ============================================================ */
 
 void test_bsl_rollback_protection(void)
 {
     struct mbk_context ctx;
-    // ロールバック対策は複雑なBFL永続化が必要なため、基本テストのみ
-    // TODO: BFL永続化を考慮したテストケース追加
-    setup_slot_header(MBK_SLOT0_BASE, 100, 0, 1024);
-    setup_slot_header(MBK_SLOT1_BASE, 100, 0, 0);
+    struct mbk_boot_info boot_info;
+    enum mbk_result result;
+
+    /* 1st boot cycle */
+    setup_slot_header(MBK_SLOT0_BASE, 1, 0, 1024);
+    setup_slot_header(MBK_SLOT1_BASE, 2, 0, 512);
 
     mbk_init(&ctx);
     mock_svl_set_verification_result(true);
-
-    struct mbk_boot_info boot_info;
-    enum mbk_result result = mbk_find_bootable_slot(&ctx, &boot_info);
+    result = mbk_find_bootable_slot(&ctx, &boot_info);
     TEST_ASSERT_EQUAL(MBK_SUCCESS, result);
+    TEST_ASSERT_EQUAL(1, boot_info.slot_id);
+
+    /* 2nd boot cycle */
+    erase_slot_region(MBK_SLOT0_BASE);
+    setup_slot_header(MBK_SLOT0_BASE, 3, 0, 256);
+
+    mbk_init(&ctx);
+    result = mbk_find_bootable_slot(&ctx, &boot_info);
+    TEST_ASSERT_EQUAL(MBK_SUCCESS, result);
+    TEST_ASSERT_EQUAL(0, boot_info.slot_id);
+
+    /* 3rd boot cycle. attempt to boot backup */
+    invalidate_slot(MBK_SLOT0_BASE);
+
+    mbk_init(&ctx);
+    result = mbk_find_bootable_slot(&ctx, &boot_info);
+    TEST_ASSERT_EQUAL(MBK_SUCCESS, result);
+    TEST_ASSERT_EQUAL(1, boot_info.slot_id);
+
+    /* 4th boot cycle. attempt to rollback-attack */
+    erase_slot_region(MBK_SLOT1_BASE);
+    setup_slot_header(MBK_SLOT1_BASE, 1, 0, 1024); /* old version */
+
+    mbk_init(&ctx);
+    result = mbk_find_bootable_slot(&ctx, &boot_info);
+    TEST_ASSERT_EQUAL(MBK_ERROR_NO_BOOTABLE_SLOT, result);
 }
 
 void test_bsl_key_generation_rollback(void)
 {
     struct mbk_context ctx;
-    // 鍵世代ロールバック対策もBFL永続化が必要
-    // TODO: BFL永続化を考慮したテストケース追加
-    setup_slot_header(MBK_SLOT0_BASE, 100, 1, 1024);
-    setup_slot_header(MBK_SLOT1_BASE, 100, 0, 0);
+    struct mbk_boot_info boot_info;
+    enum mbk_result result;
+
+    /* 1st boot cycle */
+    setup_slot_header(MBK_SLOT0_BASE, 1, 1, 1024);
 
     mbk_init(&ctx);
     mock_svl_set_verification_result(true);
 
-    struct mbk_boot_info boot_info;
-    enum mbk_result result = mbk_find_bootable_slot(&ctx, &boot_info);
+    result = mbk_find_bootable_slot(&ctx, &boot_info);
     TEST_ASSERT_EQUAL(MBK_SUCCESS, result);
+    TEST_ASSERT_EQUAL(0, boot_info.slot_id);
+
+    /* 2nd boot cycle */
+    erase_slot_region(MBK_SLOT1_BASE);
+    setup_slot_header(MBK_SLOT1_BASE, 2, 2, 1024);
+
+    mbk_init(&ctx);
+    result = mbk_find_bootable_slot(&ctx, &boot_info);
+    TEST_ASSERT_EQUAL(MBK_SUCCESS, result);
+    TEST_ASSERT_EQUAL(1, boot_info.slot_id);
+
+    /* 3rd boot cycle */
+    erase_slot_region(MBK_SLOT0_BASE);
+    setup_slot_header(MBK_SLOT0_BASE, 3, 3, 1024);
+
+    mbk_init(&ctx);
+    result = mbk_find_bootable_slot(&ctx, &boot_info);
+    TEST_ASSERT_EQUAL(MBK_SUCCESS, result);
+    TEST_ASSERT_EQUAL(0, boot_info.slot_id);
+
+    /* 4th boot cycle */
+    erase_slot_region(MBK_SLOT1_BASE);
+    setup_slot_header(MBK_SLOT1_BASE, 4, 1, 1024); /* old key generation */
+
+    mbk_init(&ctx);
+    result = mbk_find_bootable_slot(&ctx, &boot_info);
+    TEST_ASSERT_EQUAL(MBK_SUCCESS, result);
+    TEST_ASSERT_EQUAL(0, boot_info.slot_id);
+
+    /* 5th boot cycle */
+    erase_slot_region(MBK_SLOT0_BASE);
+    setup_slot_header(MBK_SLOT0_BASE, 5, 1, 1024); /* old key generation */
+
+    mbk_init(&ctx);
+    result = mbk_find_bootable_slot(&ctx, &boot_info);
+    TEST_ASSERT_EQUAL(MBK_ERROR_NO_BOOTABLE_SLOT, result);
 }
 
 /* ============================================================
- * 統合テスト
+ * Integration tests
  * ============================================================ */
 
 void test_bsl_full_boot_sequence(void)
 {
     struct mbk_context ctx;
-    // 完全な起動シーケンス（初期化前に設定）
+    /* Full boot sequence (set before initialization) */
     setup_slot_header(MBK_SLOT0_BASE, 100, 0, 2048);
     setup_slot_header(MBK_SLOT1_BASE, 50, 0, 2048);
 
@@ -277,7 +340,6 @@ void test_bsl_verification_count(void)
     struct mbk_boot_info boot_info;
     mbk_find_bootable_slot(&ctx, &boot_info);
 
-    // 署名検証が1回呼ばれる
     TEST_ASSERT_EQUAL(1, mock_svl_get_verify_count());
 }
 
@@ -384,9 +446,9 @@ void test_bsl_writeback_when_boot_data_changes(void)
 void test_bsl_both_slots_uninitialized(void)
 {
     struct mbk_context ctx;
-    // 両スロット未初期化の場合は起動不可
-    // 実機では工場出荷時に少なくとも1スロットは書き込まれる
-    hal_flash_erase_all();  // 完全に空のFlash
+    /* If both slots are uninitialized, boot is not possible
+     * In a real device, at least one slot is written at the factory. */
+    hal_flash_erase_all();  /* Absolutely empty Flash */
 
     mbk_init(&ctx);
     mock_svl_set_verification_result(true);
@@ -394,7 +456,6 @@ void test_bsl_both_slots_uninitialized(void)
     struct mbk_boot_info boot_info;
     enum mbk_result result = mbk_find_bootable_slot(&ctx, &boot_info);
 
-    // 両スロット空なので起動不可
     TEST_ASSERT_EQUAL(MBK_ERROR_NO_BOOTABLE_SLOT, result);
 }
 
@@ -402,11 +463,11 @@ int main(void)
 {
     UNITY_BEGIN();
 
-    /* 初期化テスト */
+    /* initialization */
     RUN_TEST(test_bsl_init_success);
     RUN_TEST(test_bsl_init_empty_flash);
 
-    /* スロット検索テスト */
+    /* Slot search tests */
     RUN_TEST(test_bsl_find_bootable_slot_null_param);
     RUN_TEST(test_bsl_find_bootable_slot_both_invalid);
     RUN_TEST(test_bsl_find_bootable_slot_single_valid);
@@ -415,11 +476,11 @@ int main(void)
     RUN_TEST(test_bsl_find_bootable_slot_signature_verification_failed);
     RUN_TEST(test_bsl_find_bootable_slot_fallback_to_slot1);
 
-    /* ロールバック対策テスト */
+    /* Rollback protection tests */
     RUN_TEST(test_bsl_rollback_protection);
     RUN_TEST(test_bsl_key_generation_rollback);
 
-    /* 統合テスト */
+    /* Integration tests */
     RUN_TEST(test_bsl_full_boot_sequence);
     RUN_TEST(test_bsl_verification_count);
     RUN_TEST(test_bsl_verification_skip_on_reboot);

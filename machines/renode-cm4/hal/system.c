@@ -1,24 +1,20 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/* Copyright (c) 2026 Koji KITAYAMA */
+
 #include "system.h"
 
-/**
- * @file system.c
- * @brief システム初期化実装 (Cortex-M4)
- *
- * - Renode 環境では CPU クロックはデフォルト 32MHz（設定不要）
- * - NVIC は platform.repl で初期化済み（設定不要）
- * - prepare_handoff: ユーザアプリへの制御移譲前処理
+/*
+ * - In the Renode environment, the CPU clock is 32MHz by default (no configuration needed)
+ * - NVIC is initialized in platform.repl (no configuration needed)
+ * - prepare_handoff: preparation before handing off control to the user application
  */
 
-/* ============================================================================
- * Cortex-M4 レジスタ定義
- * ========================================================================== */
-
 /**
- * @brief PRIMASK レジスタ (割り込みマスクレジスタ)
+ * @brief PRIMASK register (interrupt mask register)
  *
- * ARM Cortex-M 割り込み制御用：
- * - bit 0 = 1: 割り込み禁止
- * - bit 0 = 0: 割り込み有効
+ * ARM Cortex-M interrupt control:
+ * - bit 0 = 1: interrupts disabled
+ * - bit 0 = 0: interrupts enabled
  */
 static inline void __disable_irq(void)
 {
@@ -30,41 +26,29 @@ static inline void __enable_irq(void)
     __asm__ volatile("cpsie i" : : : "memory");
 }
 
-/* ============================================================================
- * 実装
- * ========================================================================== */
-
 void _init(void) {
-    /* C ランタイム初期化用ダミー関数 */
+    /* A dummy function for C runtime initialization */
 }
 
 void system_init(void)
 {
-    /*
-     * Renode Cortex-M4 環境での初期化:
-     * - CPU クロック: Renode デフォルト 32MHz（設定不要）
-     * - NVIC: platform.repl で自動初期化（設定不要）
-     * - スタックポインタ: startup.s で設定済み
-     *
-     * よって、ここでは特に処理なし
-     * （実ボード対応時に必要に応じて拡張）
-     */
+    /* System initialization code can be added here if needed */
 }
 
 void system_reset(void)
 {
     /*
-     * Cortex-M4 のシステムリセット
-     * NVIC_SystemReset() は CMSIS 依存のため、直接レジスタ操作で実装
+     * Cortex-M4 system reset
+     * NVIC_SystemReset() is CMSIS dependent, so implement directly with register operations
      */
     const uint32_t AIRCR_VECTKEY = 0x5FAU;
     const uint32_t AIRCR_SYSRESETREQ = (1U << 2);
     volatile uint32_t* AIRCR = (volatile uint32_t*)0xE000ED0C;
 
-    /* VECTKEY を設定して SYSRESETREQ ビットをセット */
+    /* Set VECTKEY and set the SYSRESETREQ bit */
     *AIRCR = (AIRCR_VECTKEY << 16) | AIRCR_SYSRESETREQ;
 
-    /* リセットが発生するまで無限ループ */
+    /* infinite loop until reset occurs */
     while (1) {
         __asm__ volatile("nop");
     }
@@ -73,9 +57,9 @@ void system_reset(void)
 void prepare_handoff(void)
 {
     /*
-     * ユーザアプリケーションへ制御移譲前の準備
-     * - グローバル割り込み禁止
-     *   （要求事項: 割り込みは使用しない）
+     * Preparation before handing off control to the user application
+     * - global interrupt disable
+     *   (Requirement: interrupts are not used)
      */
     __disable_irq();
 }
@@ -94,8 +78,8 @@ void jump_to_firmware(uint32_t entry_point)
 void halt(void)
 {
     /*
-     * システム停止: 割り込みを禁止して無限ループ
-     * WFI (Wait For Interrupt) で電力消費削減
+     * System halt: disable interrupts and enter infinite loop
+     * Reduce power consumption with WFI (Wait For Interrupt)
      */
     __disable_irq();
 

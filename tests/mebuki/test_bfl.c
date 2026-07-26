@@ -1,9 +1,5 @@
-/**
- * @file test_bfl.c
- * @brief BFL (Boot Flash Layer) Unit Tests
- *
- * 現行 BFL 実装の白箱テスト
- */
+/* SPDX-License-Identifier: Apache-2.0 */
+/* Copyright (c) 2026 Koji KITAYAMA */
 
 #include "unity.h"
 #include "mock_hal_flash.h"
@@ -17,7 +13,6 @@
 #  define MBK_BFL_INVALID UINT32_MAX
 #endif
 
-/* 内部型定義 */
 struct mbk_boot_history {
     uint16_t max_booted_security_version;
     uint16_t second_max_booted_security_version;
@@ -47,7 +42,6 @@ enum mbk_bfl_result {
     MBK_BFL_ERROR_WRITE_FAILED
 };
 
-/* 内部関数プロトタイプ */
 extern void bfl_load_entry(struct mbk_bfl_entry* out);
 extern enum mbk_bfl_result bfl_store_entry(struct mbk_bfl_entry* inout);
 
@@ -138,7 +132,7 @@ void tearDown(void)
 }
 
 /* ============================================================
- * 初期化テスト
+ * initialization tests
  * ============================================================ */
 
 void test_bfl_init_empty_flash_returns_uninitialized_data(void)
@@ -199,7 +193,7 @@ void test_bfl_load_both_integrity_invalid_returns_default(void)
 }
 
 /* ============================================================
- * 書き込みテスト
+ * write tests
  * ============================================================ */
 
 void test_bfl_store_entry_writes_to_opposite_sector(void)
@@ -243,7 +237,7 @@ void test_bfl_store_entry_alternates_target_sector_on_consecutive_stores(void)
 
     write_entry_direct(0, 5U, 0xA1, false);
 
-    /* 1回目: セクター0を読み込み、セクター1へ書き込むことを確認 */
+    /* 1st time: read sector 0 and write to sector 1 */
     bfl_load_entry(&e);
     read_entry_direct(0, &sec0_before);
     read_entry_direct(1, &sec1_before);
@@ -261,7 +255,7 @@ void test_bfl_store_entry_alternates_target_sector_on_consecutive_stores(void)
     TEST_ASSERT_EQUAL_MEMORY(&sec0_before, &sec0_after, sizeof(sec0_after));
     TEST_ASSERT_EQUAL_MEMORY(&e, &sec1_after, sizeof(sec1_after));
 
-    /* 2回目: セクター1を読み込み、セクター0へ書き込むことを確認 */
+    /* 2nd time: read sector 1 and write to sector 0 */
     bfl_load_entry(&e);
     read_entry_direct(0, &sec0_before);
     read_entry_direct(1, &sec1_before);
@@ -322,7 +316,7 @@ void test_bfl_store_entry_rejects_zero_remaining_stores(void)
 }
 
 /* ============================================================
- * 異常系テスト
+ * error tests
  * ============================================================ */
 
 void test_bfl_store_entry_rejects_unknown_integrity_source(void)
@@ -350,20 +344,20 @@ int main(void)
 {
     UNITY_BEGIN();
 
-    /* 初期化テスト */
+    /* initialization tests */
     RUN_TEST(test_bfl_init_empty_flash_returns_uninitialized_data);
     RUN_TEST(test_bfl_load_prefers_lower_remaining_stores);
     RUN_TEST(test_bfl_load_falls_back_when_preferred_integrity_is_invalid);
     RUN_TEST(test_bfl_load_uses_other_sector_when_first_candidate_is_invalid);
     RUN_TEST(test_bfl_load_both_integrity_invalid_returns_default);
 
-    /* 書き込みテスト */
+    /* write tests */
     RUN_TEST(test_bfl_store_entry_writes_to_opposite_sector);
     RUN_TEST(test_bfl_store_entry_alternates_target_sector_on_consecutive_stores);
     RUN_TEST(test_bfl_store_entry_returns_erase_failed_when_erase_fails);
     RUN_TEST(test_bfl_store_entry_rejects_zero_remaining_stores);
 
-    /* 異常系テスト */
+    /* error tests */
     RUN_TEST(test_bfl_store_entry_rejects_unknown_integrity_source);
 
     return UNITY_END();

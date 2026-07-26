@@ -1,13 +1,10 @@
-/**
- * @file mock_hal_flash.c
- * @brief Flash HAL Mock Implementation
- */
+/* SPDX-License-Identifier: Apache-2.0 */
+/* Copyright (c) 2026 Koji KITAYAMA */
 
 #include "mock_hal_flash.h"
 #include <string.h>
 #include <stdio.h>
 
-/* Internal mock storage */
 static bool error_injection_enabled = false;
 static uint32_t write_count = 0;
 static uint32_t erase_count = 0;
@@ -94,15 +91,15 @@ int hal_flash_write(uintptr_t address, const void* data, size_t size)
     }
 
     uint8_t* dst = (uint8_t*)address;
-    /* Flash特性をシミュレート: 1→0への変更のみ可能 */
+    /* Simulate flash characteristics: only 1->0 changes are allowed */
     const uint8_t* src = (const uint8_t*)data;
     for (size_t i = 0; i < size; i++) {
-        /* ビットが1→0にしか変更できないことをチェック */
+        /* Check that bits can only change from 1->0 */
         uint8_t current = dst[i];
         uint8_t new_val = src[i];
 
-        /* 0→1への変更があればエラー（消去が必要） */
-        /* currentが0のビットをnew_valで1にしようとしているかチェック */
+        /* Error if trying to change 0->1 (erase required) */
+        /* Check if any 0 bits in current are being set to 1 in new_val */
         if ((~current & new_val) != 0) {
             fprintf(stderr, "Mock Flash: Cannot write 0->1 without erase at 0x%p\n",
                     (void*)(address + (uintptr_t)i));
@@ -130,7 +127,7 @@ int hal_flash_erase_sector(uintptr_t address)
         fprintf(stderr, "Mock Flash: Erase out of bounds at 0x%p\n", (void*)address);
         return -1;
     }
-    /* セクター境界にアラインメント */
+    /* Align to sector boundary */
     uintptr_t sector_addr = (address / MOCK_FLASH_SECTOR_SIZE) * MOCK_FLASH_SECTOR_SIZE;
     uintptr_t sector_end = sector_addr + MOCK_FLASH_SECTOR_SIZE;
     if ((sector_addr < (MBK_DATA_BASE + MBK_BLOCK_SIZE * 2) && (MBK_DATA_BASE + MBK_BLOCK_SIZE * 2) < sector_end) &&
@@ -140,7 +137,7 @@ int hal_flash_erase_sector(uintptr_t address)
         return -1;
     }
 
-    /* セクターを0xFFで埋める */
+    /* Fill the sector with 0xFF */
     memset((void*)sector_addr, 0xFF, MOCK_FLASH_SECTOR_SIZE);
 
     erase_count++;
