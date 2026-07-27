@@ -29,12 +29,12 @@ static const uint8_t* get_public_key(uint8_t key_generation)
     return public_keys[key_generation];
 }
 
-enum mbk_svl_result mbk_svl_init(void)
+int mbk_svl_init(void)
 {
     return MBK_SVL_SUCCESS;
 }
 
-enum mbk_svl_result mbk_svl_verify_signature(const void* data, size_t data_len,
+int mbk_svl_verify_signature(const void* data, size_t data_len,
                                               const void* signature,
                                               uint8_t key_generation)
 {
@@ -70,7 +70,7 @@ enum mbk_svl_result mbk_svl_verify_signature(const void* data, size_t data_len,
     return MBK_SVL_SUCCESS;
 }
 
-enum mbk_svl_result mbk_svl_compute_hash(const void* data, size_t data_len,
+int mbk_svl_compute_hash(const void* data, size_t data_len,
                                           uint8_t digest_out[MBK_SVL_HASH_SIZE])
 {
     if (data == NULL || digest_out == NULL) {

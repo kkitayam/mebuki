@@ -3,6 +3,7 @@ test_c_args = ['-DUNIT_TEST']
 
 # Common includes and sources
 common_includes = [
+  mbk_svl_includes,
   include_directories('../mocks'),
 ]
 common_sources = [

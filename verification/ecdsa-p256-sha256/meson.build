@@ -8,7 +8,7 @@ ecdsa_includes = include_directories('.')
 
 verification_ecdsa_dep = declare_dependency(
   sources: ecdsa_sources,
-  include_directories: ecdsa_includes,
+  include_directories: [mbk_svl_includes, ecdsa_includes],
   dependencies: [bearssl_dep],
 )
 

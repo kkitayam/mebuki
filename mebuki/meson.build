@@ -5,6 +5,8 @@ mbk_sources = files(
   'src/taneue.c',
 )
 
+mbk_svl_includes = include_directories('src')
+
 mebuki_dep = declare_dependency(
   sources: mbk_sources,
   include_directories: mbk_includes,

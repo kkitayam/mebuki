@@ -17,7 +17,7 @@ fndsa_includes = include_directories('.', '../../vendor/blake2')
 
 verification_fndsa_dep = declare_dependency(
   sources: fndsa_sources,
-  include_directories: fndsa_includes,
+  include_directories: [mbk_svl_includes, fndsa_includes],
   dependencies: [c_fndsa_common_dep, c_fndsa_vrfy_dep],
 )
 

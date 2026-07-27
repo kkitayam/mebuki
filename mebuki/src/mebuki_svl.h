@@ -6,37 +6,28 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-
-/* FN-DSA-512 sizes */
-#define MBK_SVL_PUBKEY_SIZE      897
-#define MBK_SVL_SIGNATURE_SIZE   666
-#define MBK_SVL_HASH_SIZE        32
+#include <mebuki_svl_limits.h>
 
 #ifndef MBK_SVL_NUM_KEY_GENERATIONS
-#define MBK_SVL_NUM_KEY_GENERATIONS  8
+# define MBK_SVL_NUM_KEY_GENERATIONS     8U
 #endif
 
-enum mbk_svl_result {
-    MBK_SVL_SUCCESS = 0,
-    MBK_SVL_ERROR_NULL_POINTER = -1,
-    MBK_SVL_ERROR_INVALID_KEY_GEN = -2,
-    MBK_SVL_ERROR_SIGNATURE_INVALID = -3,
-    MBK_SVL_ERROR_HARDWARE_FAILURE = -4,
-};
+#define MBK_SVL_SUCCESS                  0
+#define MBK_SVL_ERROR_NULL_POINTER      -1
+#define MBK_SVL_ERROR_INVALID_KEY_GEN   -2
+#define MBK_SVL_ERROR_SIGNATURE_INVALID -3
+#define MBK_SVL_ERROR_HARDWARE_FAILURE  -4
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-enum mbk_svl_result mbk_svl_init(void);
-
-enum mbk_svl_result mbk_svl_verify_signature(const void* data, size_t data_len,
+int mbk_svl_init(void);
+int mbk_svl_verify_signature(const void* data, size_t data_len,
                                               const void* signature,
                                               uint8_t key_generation);
-
-enum mbk_svl_result mbk_svl_compute_hash(const void* data, size_t data_len,
+int mbk_svl_compute_hash(const void* data, size_t data_len,
                                           uint8_t digest_out[MBK_SVL_HASH_SIZE]);
-
 bool mbk_svl_compare_hash(const uint8_t digest1[MBK_SVL_HASH_SIZE],
                           const uint8_t digest2[MBK_SVL_HASH_SIZE]);
 

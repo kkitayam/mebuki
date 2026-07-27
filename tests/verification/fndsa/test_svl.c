@@ -37,7 +37,7 @@ void tearDown(void)
 
 void test_svl_init_success(void)
 {
-    enum mbk_svl_result result = mbk_svl_init();
+    int result = mbk_svl_init();
     TEST_ASSERT_EQUAL(MBK_SVL_SUCCESS, result);
 }
 
@@ -47,7 +47,7 @@ void test_svl_verify_signature_valid(void)
     const size_t data_len = sizeof(test_data) - 1;
     uint8_t signature[MBK_SVL_SIGNATURE_SIZE];
     size_t sig_len;
-    enum mbk_svl_result result;
+    int result;
 
     sig_len = fndsa_sign_seeded(
         test_signing_key,
@@ -74,7 +74,7 @@ void test_svl_verify_signature_invalid(void)
     const size_t data_len = sizeof(test_data) - 1;
     uint8_t signature[MBK_SVL_SIGNATURE_SIZE];
     size_t sig_len;
-    enum mbk_svl_result result;
+    int result;
 
     sig_len = fndsa_sign_seeded(
         test_signing_key,
@@ -99,14 +99,14 @@ void test_svl_verify_signature_invalid(void)
 void test_svl_verify_signature_null_data(void)
 {
     uint8_t signature[MBK_SVL_SIGNATURE_SIZE] = {0};
-    enum mbk_svl_result result = mbk_svl_verify_signature(NULL, 100, signature, 0);
+    int result = mbk_svl_verify_signature(NULL, 100, signature, 0);
     TEST_ASSERT_EQUAL(MBK_SVL_ERROR_NULL_POINTER, result);
 }
 
 void test_svl_verify_signature_null_signature(void)
 {
     const uint8_t test_data[] = "Test";
-    enum mbk_svl_result result = mbk_svl_verify_signature(test_data, sizeof(test_data) - 1, NULL, 0);
+    int result = mbk_svl_verify_signature(test_data, sizeof(test_data) - 1, NULL, 0);
     TEST_ASSERT_EQUAL(MBK_SVL_ERROR_NULL_POINTER, result);
 }
 
@@ -114,7 +114,7 @@ void test_svl_verify_signature_invalid_key_gen(void)
 {
     const uint8_t test_data[] = "Test";
     uint8_t signature[MBK_SVL_SIGNATURE_SIZE] = {0};
-    enum mbk_svl_result result = mbk_svl_verify_signature(
+    int result = mbk_svl_verify_signature(
         test_data,
         sizeof(test_data) - 1,
         signature,
@@ -132,7 +132,7 @@ void test_svl_compute_hash_known_vector(void)
         0x4d, 0x99, 0x9b, 0x4c, 0x86, 0x67, 0x59, 0x82
     };
     uint8_t computed_hash[MBK_SVL_HASH_SIZE];
-    enum mbk_svl_result result = mbk_svl_compute_hash(test_data, 3, computed_hash);
+    int result = mbk_svl_compute_hash(test_data, 3, computed_hash);
 
     TEST_ASSERT_EQUAL(MBK_SVL_SUCCESS, result);
     TEST_ASSERT_EQUAL_HEX8_ARRAY(expected_hash, computed_hash, MBK_SVL_HASH_SIZE);
@@ -153,14 +153,14 @@ void test_svl_compute_hash_consistency(void)
 void test_svl_compute_hash_null_data(void)
 {
     uint8_t digest[MBK_SVL_HASH_SIZE];
-    enum mbk_svl_result result = mbk_svl_compute_hash(NULL, 100, digest);
+    int result = mbk_svl_compute_hash(NULL, 100, digest);
     TEST_ASSERT_EQUAL(MBK_SVL_ERROR_NULL_POINTER, result);
 }
 
 void test_svl_compute_hash_null_output(void)
 {
     const uint8_t test_data[] = "Test";
-    enum mbk_svl_result result = mbk_svl_compute_hash(test_data, sizeof(test_data) - 1, NULL);
+    int result = mbk_svl_compute_hash(test_data, sizeof(test_data) - 1, NULL);
     TEST_ASSERT_EQUAL(MBK_SVL_ERROR_NULL_POINTER, result);
 }
 

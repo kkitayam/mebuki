@@ -4,7 +4,8 @@
 #include "unity.h"
 #include "mock_hal_flash.h"
 #include "mock_svl.h"
-#include "mebuki.h"
+#include <mebuki.h>
+#include <mebuki_svl.h>
 #include <stdint.h>
 #include <string.h>
 

@@ -4,9 +4,10 @@
 #include "mock_svl.h"
 #include <string.h>
 #include <stdio.h>
+#include <mebuki_svl.h>
 
 /* Internal mock state */
-static uint8_t mock_public_keys[MOCK_SVL_NUM_KEY_GENERATIONS][MOCK_SVL_PUBKEY_SIZE];
+static uint8_t mock_public_keys[MBK_SVL_NUM_KEY_GENERATIONS][MBK_SVL_PUBKEY_SIZE];
 static bool verification_result = true;
 static bool hash_error_enabled = false;
 static bool verify_error_enabled = false;
@@ -15,15 +16,16 @@ static uint32_t verify_count = 0;
 static uint32_t hash_count = 0;
 static bool initialized = false;
 
-static void simple_hash(const uint8_t* data, size_t len, uint8_t output[MOCK_SVL_HASH_SIZE])
+static void simple_hash(const void* data, size_t len, uint8_t output[MBK_SVL_HASH_SIZE])
 {
     /* Deterministic hash calculation for testing */
-    memset(output, 0, MOCK_SVL_HASH_SIZE);
+    memset(output, 0, MBK_SVL_HASH_SIZE);
 
     /* Simple hash: mix each byte of the data into the hash */
+    const uint8_t* bytes = (const uint8_t*)data;
     for (size_t i = 0; i < len; i++) {
-        output[i % MOCK_SVL_HASH_SIZE] ^= data[i];
-        output[(i + 1) % MOCK_SVL_HASH_SIZE] ^= (data[i] >> 4);
+        output[i % MBK_SVL_HASH_SIZE] ^= bytes[i];
+        output[(i + 1) % MBK_SVL_HASH_SIZE] ^= (bytes[i] >> 4);
     }
 
     /* mix in the length information */
@@ -32,7 +34,7 @@ static void simple_hash(const uint8_t* data, size_t len, uint8_t output[MOCK_SVL
     }
 }
 
-enum mbk_svl_result mbk_svl_init(void)
+int mbk_svl_init(void)
 {
     if (init_error_enabled) {
         init_error_enabled = false;
@@ -46,8 +48,8 @@ enum mbk_svl_result mbk_svl_init(void)
     return MBK_SVL_SUCCESS;
 }
 
-enum mbk_svl_result mbk_svl_verify_signature(const uint8_t* data, size_t data_len,
-                                       const uint8_t* signature,
+int mbk_svl_verify_signature(const void* data, size_t data_len,
+                                       const void* signature,
                                        uint8_t key_generation)
 {
     (void)data_len; /* Unused parameter in mock */
@@ -60,7 +62,7 @@ enum mbk_svl_result mbk_svl_verify_signature(const uint8_t* data, size_t data_le
         return MBK_SVL_ERROR_NULL_POINTER;
     }
 
-    if (key_generation >= MOCK_SVL_NUM_KEY_GENERATIONS) {
+    if (key_generation >= MBK_SVL_NUM_KEY_GENERATIONS) {
         return MBK_SVL_ERROR_INVALID_KEY_GEN;
     }
 
@@ -68,8 +70,8 @@ enum mbk_svl_result mbk_svl_verify_signature(const uint8_t* data, size_t data_le
     return verification_result ? MBK_SVL_SUCCESS : MBK_SVL_ERROR_SIGNATURE_INVALID;
 }
 
-enum mbk_svl_result mbk_svl_compute_hash(const uint8_t* data, size_t data_len,
-                                   uint8_t digest_out[MOCK_SVL_HASH_SIZE])
+int mbk_svl_compute_hash(const void* data, size_t data_len,
+                                   uint8_t digest_out[MBK_SVL_HASH_SIZE])
 {
     if (hash_error_enabled) {
         return MBK_SVL_ERROR_NULL_POINTER;
@@ -84,24 +86,24 @@ enum mbk_svl_result mbk_svl_compute_hash(const uint8_t* data, size_t data_len,
     return MBK_SVL_SUCCESS;
 }
 
-bool mbk_svl_compare_hash(const uint8_t digest1[MOCK_SVL_HASH_SIZE],
-                          const uint8_t digest2[MOCK_SVL_HASH_SIZE])
+bool mbk_svl_compare_hash(const uint8_t digest1[MBK_SVL_HASH_SIZE],
+                          const uint8_t digest2[MBK_SVL_HASH_SIZE])
 {
     if (!digest1 || !digest2) {
         return false;
     }
 
-    return memcmp(digest1, digest2, MOCK_SVL_HASH_SIZE) == 0;
+    return memcmp(digest1, digest2, MBK_SVL_HASH_SIZE) == 0;
 }
 
 /* ============================================================
  * Mock control functions
  * ============================================================ */
 
-void mock_svl_set_public_key(uint8_t key_gen, const uint8_t pubkey[MOCK_SVL_PUBKEY_SIZE])
+void mock_svl_set_public_key(uint8_t key_gen, const uint8_t pubkey[MBK_SVL_PUBKEY_SIZE])
 {
-    if (key_gen < MOCK_SVL_NUM_KEY_GENERATIONS && pubkey != NULL) {
-        memcpy(mock_public_keys[key_gen], pubkey, MOCK_SVL_PUBKEY_SIZE);
+    if (key_gen < MBK_SVL_NUM_KEY_GENERATIONS && pubkey != NULL) {
+        memcpy(mock_public_keys[key_gen], pubkey, MBK_SVL_PUBKEY_SIZE);
     }
 }
 
