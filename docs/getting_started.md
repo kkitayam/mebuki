@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document explains how to build and run mebuki.
+This document explains how to build and run Mebuki.
 
 This document is for first-time users.
 
@@ -12,10 +12,12 @@ Install these tools before you continue.
 
 * Git
 * Python 3
-* [uv](https://docs.astral.sh/uv/
+* [uv](https://docs.astral.sh/uv/)
 * [Meson](https://mesonbuild.com/)
 * [Ninja](https://ninja-build.org/)
-* A C compiler (Arm GCC for cross build, GCC or Clang for native build)
+* A C compiler
+  * Arm GNU Toolchain for cross builds
+  * GCC or Clang for native builds
 
 Use a compiler that supports C23.
 
@@ -38,13 +40,13 @@ uv venv
 
 Activate the environment.
 
-Windows:
+### Windows
 
 ```sh
 .venv\Scripts\activate
 ```
 
-Linux:
+### Linux
 
 ```sh
 source .venv/bin/activate
@@ -52,9 +54,11 @@ source .venv/bin/activate
 
 ## Install mebuki-sign
 
-Install the image signing tool.
+Mebuki uses **mebuki-sign** to generate signed firmware images.
 
-The source code is available from [mebuki-sign](https://github.com/kkitayam/mebuki-sign).
+The project is available at:
+
+https://github.com/kkitayam/mebuki-sign
 
 Install the latest version from the Git repository.
 
@@ -68,18 +72,21 @@ Verify the installation.
 mebuki-sign --help
 ```
 
-## Run an Example
+## Run a Reference Example
 
 Configure a cross build.
 
 ```sh
-uv run meson setup builddir-cross --cross-file cross/arm-none-eabi-gcc.ini
+uv run meson setup builddir \
+    --cross-file cross/arm-none-eabi-gcc.ini \
+    -Dtarget=renode-cm4 \
+    -Dsvl=fndsa
 ```
 
-Build and run the `run_slot0` example.
+Build and run the first example.
 
 ```sh
-uv run meson compile -C builddir-cross run_slot0
+uv run meson compile -C builddir run_slot0
 ```
 
 Renode starts automatically.
@@ -102,18 +109,26 @@ Booting slot 0...
 hello world
 ```
 
-The values in the output can change.
+The values can differ.
 
-The final line, `hello world`, confirms that the example ran successfully.
+The final line, `hello world`, confirms that the application started successfully.
 
 The repository provides these example targets.
 
-| Target               | Description                                                                |
-| -------------------- | -------------------------------------------------------------------------- |
-| `run_slot0`          | Boot a valid image from slot 0.                                            |
-| `run_higher_version` | Boot the bootable image that has the highest version.                      |
-| `run_keygen_mix`     | Boot an image after signature verification with different key generations. |
-| `run_boot_only`      | Start the bootloader without an application image.                         |
+| Target | Description |
+|---------|-------------|
+| `run_slot0` | Boot a valid image from slot 0. |
+| `run_higher_version` | Boot the image that has the highest Security Version. |
+| `run_keygen_mix` | Verify images that use different verification key generations. |
+| `run_boot_only` | Start only the bootloader. Do not load an application image. |
+
+Build another example by replacing the target name.
+
+Example:
+
+```sh
+uv run meson compile -C builddir run_higher_version
+```
 
 ## Run the Unit Tests
 
@@ -133,15 +148,15 @@ uv run meson test -C builddir-native
 
 The unit tests run on the host computer.
 
-## Use mebuki in Your Project
+## Use Mebuki in Your Project
 
-Add `mebuki_dep` to your Meson project.
+Add `mebuki_dep` to your Meson target.
 
 ```meson
-dependencies: [mebuki_dep]
+dependencies : [mebuki_dep]
 ```
 
-Include only the public API.
+Include the public API.
 
 ```c
 #include <mebuki.h>

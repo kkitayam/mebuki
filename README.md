@@ -1,145 +1,158 @@
 # mebuki
 
-A lightweight secure boot library for resource-constrained MCUs with native support for **Post-Quantum Cryptography (PQC)**.
+A lightweight secure boot library for resource-constrained MCUs.
 
-Mebuki focuses exclusively on the core responsibilities of secure boot -- firmware authentication, rollback protection, verification key management, and persistent security state management. Its modular architecture separates secure boot logic from cryptographic implementations, allowing signature algorithms to evolve independently without changing the boot flow.
+Mebuki provides the core functions that a secure boot process requires.
 
-Unlike complete firmware update frameworks, Mebuki intentionally leaves firmware download, image storage, and flash programming under application control, providing only the secure boot functionality required to verify and activate trusted firmware.
+* Firmware authentication
+* Rollback protection
+* Verification key management
+* Persistent security state management
+
+Mebuki separates secure boot logic from cryptographic implementations. This design lets you change the signature algorithm without changing the boot flow.
+
+Mebuki does not provide firmware download, image storage, or flash programming. Your application controls these functions.
 
 ## Goals
 
-- ✓ Public-key Secure Boot
-- ✓ Post-Quantum Ready
-- ✓ Power-loss Resilient
-- ✓ Portable
-- ✓ Small Footprint
+* Public-key secure boot
+* Post-quantum ready
+* Power-loss resilient
+* Portable
+* Small footprint
 
 ## Features
 
-### Security
+### Firmware Authentication
 
-#### Firmware Authentication
+Mebuki verifies firmware authenticity and integrity with digital signatures.
 
-Verifies firmware authenticity and integrity using digital signatures.
+Select the verification algorithm at build time.
 
-Supports **ECDSA-P256-SHA256** and the post-quantum signature scheme **FN-DSA-512** (FIPS 206). The verification algorithm is selected at build time to balance security, performance, and code size.
+Supported algorithms:
 
-#### Rollback Protection
+* ECDSA-P256-SHA256
+* FN-DSA-512 (FIPS 206)
 
-Prevents firmware rollback using a dedicated **Security Version** field stored in the image header.
+### Rollback Protection
 
-#### Pre-provisioned Verification Key Rotation
+Mebuki prevents firmware rollback.
 
-Supports forward-only verification key rotation using a pre-provisioned public key list.
+Each firmware image contains a Security Version.
 
-When firmware signed with the next (or any subsequent) verification key is successfully verified, Mebuki automatically advances the active verification key. Previously accepted keys are permanently retired after advancement.
+Mebuki rejects firmware that uses an older Security Version than the stored value.
 
-### Reliability
+### Verification Key Rotation
 
-#### Power-loss Resilient Security State Management
+Mebuki supports forward-only verification key rotation.
 
-Maintains the integrity of the persistent security state -- including the Security Version and active verification key -- across unexpected power loss using redundant boot history records.
+The device stores multiple verification keys.
 
-### Update Support
+When verification succeeds with a newer key, Mebuki updates the active key automatically.
 
-#### Optional Resumable Slot Swap
+Mebuki never enables an older key again.
 
-Provides an optional power-loss resilient slot swap mechanism that automatically resumes and completes an interrupted slot swap after reset.
+### Persistent Security State
+
+Mebuki stores the Security Version and the active verification key in redundant boot history records.
+
+This design protects the security state from unexpected power loss.
+
+### Optional Slot Swap
+
+Mebuki provides an optional slot swap mechanism.
+
+If power fails during a slot swap, Mebuki resumes the operation after reset.
 
 ## Quick Start
 
-Build the project using [Meson](https://mesonbuild.com/) and [Renode](https://renode.io/).
+See [docs/getting_started.md](docs/getting_started.md) for the complete setup procedure.
+
+Typical commands:
 
 ```sh
-git clone <repository>
+git clone https://github.com/kkitayam/mebuki.git
 cd mebuki
 
-meson setup builddir --cross-file cross/arm-none-eabi-gcc.ini -Dtarget=renode-cm4 -Dsvl=fndsa
-meson compile -C builddir             # Generate boot.elf and app.v0.k0.img, app.v1.k1.img, ... , app.vN.kN.img
-meson compile -C builddir run_slot0   # Run the reference example with the first slot (app.v1.k0.img)
+uv venv
+. .venv/bin/activate        # Linux
+# .venv\Scripts\activate    # Windows
+
+uv pip install git+https://github.com/kkitayam/mebuki-sign.git
+
+uv run meson setup builddir \
+    --cross-file cross/arm-none-eabi-gcc.ini \
+    -Dtarget=renode-cm4 \
+    -Dsvl=fndsa
+
+uv run meson compile -C builddir run_slot0
 ```
-
-The reference example requires a firmware image signed with [mebuki-sign](https://github.com/kkitayam/mebuki-sign).
-
-Generate a signed firmware image using [mebuki-sign](https://github.com/kkitayam/mebuki-sign), then run the reference example.
-
-For the complete workflow -- including key generation, firmware signing, image creation, and execution -- see the **Getting Started** guide in `docs/`.
 
 ## Repository Layout
 
 ```text
 mebuki/
-├── mebuki/             Core secure boot library
+├── mebuki/          Core secure boot library
 │   ├── include/
 │   └── src/
-│
-├── verification/       Verification algorithm implementations
+├── verification/    Verification algorithm integration
 │   ├── ecdsa-p256-sha256/
 │   └── fndsa/
-│
-├── machines/           Target machine implementations (startup/linker/HAL/runner)
-├── cross/              Meson cross files
-├── examples/           Reference boot/app and use case definitions
-├── tests/              Unit tests
-├── docs/               Documentation
-├── vendor/             Bundled third-party source code
-└── subprojects/        External dependencies managed by Meson Wrap
+├── machines/        Target machine support
+├── cross/           Meson cross files
+├── examples/        Reference applications
+├── tests/           Unit tests
+├── docs/            Documentation
+├── vendor/          Bundled third-party source code
+└── subprojects/     External dependencies
 ```
 
-The `verification/` directory contains only the integration layer between Mebuki and each verification algorithm. Third-party cryptographic libraries are managed separately under `subprojects/`.
+The [verification/](verification/) directory contains only the integration layer.
 
-## Supported Platforms
+Third-party cryptographic libraries remain separate.
 
-Mebuki is designed for resource-constrained embedded systems.
+## Requirements
 
-### Requirements
+Mebuki requires:
 
-- Resource-constrained MCU
-- C23 compiler
-- Little-endian architecture
-- Execute-in-Place (XiP) NOR Flash
-- Platform-specific Flash read/write/erase driver
+* A resource-constrained MCU
+* A C23 compiler
+* A little-endian architecture
+* Execute-in-Place (XiP) NOR Flash
+* Platform-specific Flash read, write, and erase functions
 
-### Out of Scope
+## Out of Scope
 
-Mebuki intentionally does **not** provide:
+Mebuki does not provide:
 
-- Firmware download
-- Communication protocols
-- Firmware image programming
-- Device-specific boot initialization
+* Firmware download
+* Communication protocols
+* Firmware image programming
+* Device-specific boot initialization
 
-These responsibilities remain under application control.
+These functions remain under application control.
 
 ## Cryptographic Libraries
 
-Mebuki delegates cryptographic operations to dedicated external libraries rather than implementing signature algorithms itself.
+Mebuki delegates cryptographic operations to external libraries.
 
 | Verification Algorithm | Library |
-| ---------------------- | ------- |
-| **ECDSA-P256-SHA256** | BearSSL by Thomas Pornin |
-| **FN-DSA-512** | c-fn-dsa by Thomas Pornin |
+|-------------------------|---------|
+| ECDSA-P256-SHA256 | [BearSSL](https://bearssl.org/) |
+| FN-DSA-512 | [c-fn-dsa](https://github.com/pornin/c-fn-dsa) |
 
-This separation keeps the secure boot framework compact, maintainable, and easy to audit while allowing cryptographic implementations to evolve independently.
-
-## Documentation
-
-The following documents provide more detailed information.
-
-- Getting Started
-- Architecture Overview
-- Porting Guide
-- Image Format Specification
-- API Reference
+This separation keeps the secure boot framework small and easy to maintain.
 
 ## Project Status
 
-Mebuki is a personal open-source project developed with an emphasis on simplicity, portability, and modern cryptography.
+Mebuki is a hobby open-source project.
 
-Although designed with production-quality engineering principles, it has not yet reached the maturity or ecosystem of long-established secure boot projects.
+The project is intended for learning, experimentation, and evaluation.
 
-For commercial products or long-term maintained platforms, consider evaluating established solutions such as [MCUboot](https://github.com/mcu-tools/mcuboot) alongside Mebuki to determine the best fit for your requirements.
+Do not use Mebuki as the primary secure boot solution for production products.
+
+For production systems, use an established project such as [MCUboot](https://github.com/mcu-tools/mcuboot).
 
 ## License
 
-See the `LICENSE` file for licensing information.
+See `LICENSE`.
