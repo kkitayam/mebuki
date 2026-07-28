@@ -42,8 +42,11 @@
  */
 #define MBK_BLOCK_SIZE          4096U
 
-/* Base address of the persistent data area. */
-#define MBK_DATA_BASE           BFL_BASE
+/* Base address of BFL sector 0. */
+#define MBK_DATA0_BASE          BFL_BASE
+
+/* Base address of BFL sector 1. */
+#define MBK_DATA1_BASE          (BFL_BASE + MBK_BLOCK_SIZE)
 
 /* ============================================================================
  * Firmware slots

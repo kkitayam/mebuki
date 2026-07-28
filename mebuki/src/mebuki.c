@@ -79,20 +79,26 @@ static_assert((MBK_BLOCK_SIZE % 16U) == 0U,
               "MBK_BLOCK_SIZE must be a multiple of 16 (min 16-byte alignment)");
 static_assert((MBK_BLOCK_SIZE % MBK_FLASH_PAGE_SIZE) == 0U,
               "MBK_BLOCK_SIZE must be a multiple of MBK_FLASH_PAGE_SIZE");
-static_assert((MBK_DATA_BASE % MBK_BLOCK_SIZE) == 0U,
-              "MBK_DATA_BASE must be MBK_BLOCK_SIZE aligned");
+static_assert((MBK_DATA0_BASE % MBK_BLOCK_SIZE) == 0U,
+              "MBK_DATA0_BASE must be MBK_BLOCK_SIZE aligned");
+static_assert((MBK_DATA1_BASE % MBK_BLOCK_SIZE) == 0U,
+              "MBK_DATA1_BASE must be MBK_BLOCK_SIZE aligned");
 static_assert((MBK_SLOT0_BASE % MBK_BLOCK_SIZE) == 0U,
               "MBK_SLOT0_BASE must be MBK_BLOCK_SIZE aligned");
 static_assert((MBK_SLOT1_BASE % MBK_BLOCK_SIZE) == 0U,
               "MBK_SLOT1_BASE must be MBK_BLOCK_SIZE aligned");
 static_assert((MBK_SLOT_SIZE % MBK_BLOCK_SIZE) == 0U,
               "MBK_SLOT_SIZE must be multiple of MBK_BLOCK_SIZE");
-static_assert((MBK_DATA_BASE % 16U) == 0U,
-              "MBK_DATA_BASE must be at least 16-byte aligned");
+static_assert((MBK_DATA0_BASE % 16U) == 0U,
+              "MBK_DATA0_BASE must be at least 16-byte aligned");
+static_assert((MBK_DATA1_BASE % 16U) == 0U,
+              "MBK_DATA1_BASE must be at least 16-byte aligned");
 static_assert((MBK_SLOT0_BASE % 16U) == 0U,
               "MBK_SLOT0_BASE must be at least 16-byte aligned");
 static_assert((MBK_SLOT1_BASE % 16U) == 0U,
               "MBK_SLOT1_BASE must be at least 16-byte aligned");
+static_assert(MBK_DATA0_BASE != MBK_DATA1_BASE,
+              "MBK_DATA0_BASE and MBK_DATA1_BASE must be different sectors");
 
 /* --- BEL Types --- */
 
@@ -345,15 +351,17 @@ STATIC uint32_t bfl_compute_record_integrity(const struct mbk_bfl_entry* entry)
 
 STATIC void bfl_load_entry(struct mbk_bfl_entry* out)
 {
-    const struct mbk_bfl_sector* secs = (const struct mbk_bfl_sector*)MBK_DATA_BASE;
-    const uint32_t rem0 = secs[0].entry.remaining_stores;
-    const uint32_t rem1 = secs[1].entry.remaining_stores;
+    const struct mbk_bfl_sector* sec0 = (const struct mbk_bfl_sector*)MBK_DATA0_BASE;
+    const struct mbk_bfl_sector* sec1 = (const struct mbk_bfl_sector*)MBK_DATA1_BASE;
+    const struct mbk_bfl_sector* secs[MBK_BFL_NUM_BLOCKS] = {sec0, sec1};
+    const uint32_t rem0 = sec0->entry.remaining_stores;
+    const uint32_t rem1 = sec1->entry.remaining_stores;
     /* Prefer the entry with the smaller remaining_stores value. */
     bool prefer_sec1 = rem1 != MBK_BFL_INVALID && (rem0 == MBK_BFL_INVALID || rem1 < rem0);
 
     int n = prefer_sec1 ? 1 : 0;
     for (unsigned int i = 0; i < MBK_BFL_NUM_BLOCKS; ++i, n ^= 1) {
-        *out = secs[n].entry;
+        *out = secs[n]->entry;
         if (out->integrity == bfl_compute_record_integrity(out)) {
             return;
         }
@@ -364,6 +372,8 @@ STATIC void bfl_load_entry(struct mbk_bfl_entry* out)
 STATIC int bfl_store_entry(struct mbk_bfl_entry* inout)
 {
     const uint32_t rem = inout->remaining_stores;
+    const struct mbk_bfl_sector* sec0 = (const struct mbk_bfl_sector*)MBK_DATA0_BASE;
+    const struct mbk_bfl_sector* sec1 = (const struct mbk_bfl_sector*)MBK_DATA1_BASE;
     int err;
 
     if (0 == rem) {
@@ -371,14 +381,13 @@ STATIC int bfl_store_entry(struct mbk_bfl_entry* inout)
         return MBK_BFL_ERROR_NO_REMAINING_STORES;
     }
 
-    struct mbk_bfl_sector* secs = (struct mbk_bfl_sector*)MBK_DATA_BASE;
-    /* Write to the alternate flash block (ping-pong update). */
+    /* Write to the alternate configured sector (ping-pong update). */
     uintptr_t target_addr;
     const uint32_t c = inout->integrity;
-    if (c == secs[0].entry.integrity) {
-        target_addr = (uintptr_t)&secs[1];
-    } else if (c == secs[1].entry.integrity) {
-        target_addr = (uintptr_t)&secs[0];
+    if (c == sec0->entry.integrity) {
+        target_addr = MBK_DATA1_BASE;
+    } else if (c == sec1->entry.integrity) {
+        target_addr = MBK_DATA0_BASE;
     } else {
         MBK_LOG("BFL store failed: integrity mismatch\n");
         return MBK_BFL_ERROR_INTEGRITY_MISMATCH;

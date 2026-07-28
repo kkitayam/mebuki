@@ -47,13 +47,20 @@
 #define MBK_BLOCK_SIZE              4096U
 
 /*
- * Base address of the persistent data area.
+ * Base address of BFL sector 0.
  *
  * Requirements:
  *   - Must be aligned to MBK_BLOCK_SIZE.
  *   - The implementation performs direct loads from aligned structures.
  */
-#define MBK_DATA_BASE               0x08000000U
+#define MBK_DATA0_BASE              0x08000000U
+
+/*
+ * Base address of BFL sector 1.
+ *
+ * Requirements are identical to MBK_DATA0_BASE.
+ */
+#define MBK_DATA1_BASE              0x08001000U
 
 
 /* =========================================================================
@@ -98,7 +105,8 @@
  *   - Must be aligned to MBK_BLOCK_SIZE.
  *   - The implementation directly loads uint16_t progress fields.
  */
-#define TANEUE_PROGRESS_BASE        (MBK_DATA_BASE + (MBK_BLOCK_SIZE * 2U))
+#define TANEUE_PROGRESS_BASE        \
+    (((MBK_DATA0_BASE > MBK_DATA1_BASE) ? MBK_DATA0_BASE : MBK_DATA1_BASE) + MBK_BLOCK_SIZE)
 
 /*
  * Size of the Taneue progress area in bytes, including the header.

@@ -39,7 +39,8 @@ struct taneue_progress_scan {
  * constraints when overriding this definition.
  */
 #ifndef TANEUE_PROGRESS_BASE
-#  define TANEUE_PROGRESS_BASE (MBK_DATA_BASE + (MBK_BLOCK_SIZE * 2U))
+#  define TANEUE_PROGRESS_BASE \
+      (((MBK_DATA0_BASE > MBK_DATA1_BASE) ? MBK_DATA0_BASE : MBK_DATA1_BASE) + MBK_BLOCK_SIZE)
 #endif
 
 #ifndef TANEUE_PROGRESS_SIZE

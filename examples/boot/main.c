@@ -131,8 +131,8 @@ int main(void)
     uart_puts("\r\n");
 
 #if 0
-    dump((const uint8_t*)MBK_DATA_BASE, (const uint8_t*)MBK_DATA_BASE + 64);
-    dump((const uint8_t*)MBK_DATA_BASE + MBK_BLOCK_SIZE, (const uint8_t*)MBK_DATA_BASE + MBK_BLOCK_SIZE + 64);
+    dump((const uint8_t*)MBK_DATA0_BASE, (const uint8_t*)MBK_DATA0_BASE + 64);
+    dump((const uint8_t*)MBK_DATA1_BASE, (const uint8_t*)MBK_DATA1_BASE + 64);
 #endif
     if (boot_info.slot_id == 1) {
         /* The application software is built to run from slot0, so a swap is necessary when booting from slot1 */
