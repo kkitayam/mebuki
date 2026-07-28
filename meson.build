@@ -1,7 +1,7 @@
 project('mebuki', 'c',
   version : '0.1.0',
   meson_version : '>=1.10.0',
-  default_options : ['c_std=c23']
+  default_options : ['c_std=c23', 'buildtype=minsize']
 )
 
 build_examples = meson.is_cross_build()

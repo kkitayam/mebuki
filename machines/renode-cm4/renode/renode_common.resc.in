@@ -5,6 +5,7 @@ machine LoadPlatformDescription @@PLATFORM_REPL@
 cpu FpuEnabled true
 sysbus LoadELF @@BOOT_ELF@
 @LOAD_APP_LINES@
-machine StartGdbServer @GDB_PORT@
+#machine StartGdbServer @GDB_PORT@
 showAnalyzer sysbus.uart0
 #cpu EnableProfiler CollapsedStack $CWD/perf.dat true
+start

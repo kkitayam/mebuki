@@ -48,19 +48,20 @@ Provides an optional power-loss resilient slot swap mechanism that automatically
 
 ## Quick Start
 
-Build the project using Meson.
+Build the project using [Meson](https://mesonbuild.com/) and [Renode](https://renode.io/).
 
 ```sh
 git clone <repository>
 cd mebuki
 
-meson setup build
-meson compile -C build
+meson setup builddir --cross-file cross/arm-none-eabi-gcc.ini -Dtarget=renode-cm4 -Dsvl=fndsa
+meson compile -C builddir             # Generate boot.elf and app.v0.k0.img, app.v1.k1.img, ... , app.vN.kN.img
+meson compile -C builddir run_slot0   # Run the reference example with the first slot (app.v1.k0.img)
 ```
 
-The reference example requires a firmware image signed with **mebuki-sign**.
+The reference example requires a firmware image signed with [mebuki-sign](https://github.com/kkitayam/mebuki-sign).
 
-Generate a signed firmware image using `mebuki-sign`, then run the reference example.
+Generate a signed firmware image using [mebuki-sign](https://github.com/kkitayam/mebuki-sign), then run the reference example.
 
 For the complete workflow -- including key generation, firmware signing, image creation, and execution -- see the **Getting Started** guide in `docs/`.
 
@@ -94,7 +95,7 @@ Mebuki is designed for resource-constrained embedded systems.
 ### Requirements
 
 - Resource-constrained MCU
-- C99 compiler
+- C23 compiler
 - Little-endian architecture
 - Execute-in-Place (XiP) NOR Flash
 - Platform-specific Flash read/write/erase driver
