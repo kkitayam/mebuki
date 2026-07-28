@@ -47,7 +47,7 @@ extern enum mbk_bfl_result bfl_store_entry(struct mbk_bfl_entry* inout);
 
 static uintptr_t get_sector_address(int sector_id)
 {
-    return MBK_DATA_BASE + ((uintptr_t)sector_id * (uintptr_t)MBK_BLOCK_SIZE);
+    return (sector_id == 0) ? MBK_DATA0_BASE : MBK_DATA1_BASE;
 }
 
 static uint32_t crc32_update(uint32_t crc, const uint8_t* data, size_t size)

@@ -9,13 +9,42 @@ static bool error_injection_enabled = false;
 static uint32_t write_count = 0;
 static uint32_t erase_count = 0;
 
-#define MOCK_META_REGION_START \
-    ((MBK_DATA_BASE < TANEUE_PROGRESS_BASE) ? MBK_DATA_BASE : TANEUE_PROGRESS_BASE)
-#define MOCK_META_REGION_END \
-    (((MBK_DATA_BASE + MBK_BLOCK_SIZE * 2U) > (TANEUE_PROGRESS_BASE + TANEUE_PROGRESS_SIZE)) \
-        ? (MBK_DATA_BASE + MBK_BLOCK_SIZE * 2U) \
-        : (TANEUE_PROGRESS_BASE + TANEUE_PROGRESS_SIZE))
-#define MOCK_META_REGION_SIZE (MOCK_META_REGION_END - MOCK_META_REGION_START)
+static bool address_in_range(uintptr_t address, uintptr_t base, size_t size)
+{
+    return (address >= base) && (address < (base + size));
+}
+
+static bool range_in_range(uintptr_t address, size_t size, uintptr_t base, size_t region_size)
+{
+    return (address >= base) && ((address + size) <= (base + region_size));
+}
+
+static bool address_is_writable(uintptr_t address)
+{
+    return address_in_range(address, MBK_DATA0_BASE, MBK_BLOCK_SIZE) ||
+           address_in_range(address, MBK_DATA1_BASE, MBK_BLOCK_SIZE) ||
+           address_in_range(address, TANEUE_PROGRESS_BASE, TANEUE_PROGRESS_SIZE) ||
+           address_in_range(address, MBK_SLOT0_BASE, MBK_SLOT_SIZE) ||
+           address_in_range(address, MBK_SLOT1_BASE, MBK_SLOT_SIZE);
+}
+
+static bool sector_range_is_erasable(uintptr_t sector_addr)
+{
+    return range_in_range(sector_addr, MOCK_FLASH_SECTOR_SIZE, MBK_DATA0_BASE, MBK_BLOCK_SIZE) ||
+           range_in_range(sector_addr, MOCK_FLASH_SECTOR_SIZE, MBK_DATA1_BASE, MBK_BLOCK_SIZE) ||
+           range_in_range(sector_addr, MOCK_FLASH_SECTOR_SIZE, TANEUE_PROGRESS_BASE, TANEUE_PROGRESS_SIZE) ||
+           range_in_range(sector_addr, MOCK_FLASH_SECTOR_SIZE, MBK_SLOT0_BASE, MBK_SLOT_SIZE) ||
+           range_in_range(sector_addr, MOCK_FLASH_SECTOR_SIZE, MBK_SLOT1_BASE, MBK_SLOT_SIZE);
+}
+
+struct mapped_region {
+    uintptr_t base;
+    size_t size;
+};
+
+#define MOCK_MAX_MAPPED_REGIONS 8U
+static struct mapped_region mapped_regions[MOCK_MAX_MAPPED_REGIONS];
+static size_t mapped_region_count = 0U;
 
 #ifdef _WIN32
 # define WIN32_LEAN_AND_MEAN
@@ -39,6 +68,13 @@ static void unmap_memory(uintptr_t address, size_t size)
     }
 }
 # endif
+
+static size_t get_mapping_granularity(void)
+{
+    SYSTEM_INFO info;
+    GetSystemInfo(&info);
+    return (size_t)info.dwAllocationGranularity;
+}
 #else
 # include <sys/mman.h>
 # include <unistd.h>
@@ -62,7 +98,49 @@ static void unmap_memory(uintptr_t address, size_t size)
         munmap((void *)address, size);
     }
 }
+
+static size_t get_mapping_granularity(void)
+{
+    return (size_t)sysconf(_SC_PAGESIZE);
+}
 #endif
+
+static uintptr_t align_down(uintptr_t value, size_t alignment)
+{
+    return value & ~((uintptr_t)alignment - 1U);
+}
+
+static uintptr_t align_up(uintptr_t value, size_t alignment)
+{
+    return (value + (uintptr_t)alignment - 1U) & ~((uintptr_t)alignment - 1U);
+}
+
+static bool map_memory_once(uintptr_t address, size_t size)
+{
+    const size_t granularity = get_mapping_granularity();
+    const uintptr_t map_base = align_down(address, granularity);
+    const uintptr_t map_end = align_up(address + size, granularity);
+    const size_t map_size = (size_t)(map_end - map_base);
+
+    for (size_t i = 0; i < mapped_region_count; ++i) {
+        const uintptr_t base = mapped_regions[i].base;
+        const uintptr_t end = base + mapped_regions[i].size;
+        if (map_base >= base && map_end <= end) {
+            return true;
+        }
+    }
+
+    if (map_memory(map_base, map_size) != (void*)map_base) {
+        return false;
+    }
+
+    if (mapped_region_count < MOCK_MAX_MAPPED_REGIONS) {
+        mapped_regions[mapped_region_count].base = map_base;
+        mapped_regions[mapped_region_count].size = map_size;
+        mapped_region_count++;
+    }
+    return true;
+}
 
 int hal_flash_init(void)
 {
@@ -79,10 +157,7 @@ int hal_flash_write(uintptr_t address, const void* data, size_t size)
         return -1;
     }
 
-    if ((address < MBK_DATA_BASE || address >= (MBK_DATA_BASE + MBK_BLOCK_SIZE * 2)) &&
-        (address < TANEUE_PROGRESS_BASE || address >= (TANEUE_PROGRESS_BASE + TANEUE_PROGRESS_SIZE)) &&
-        (address < MBK_SLOT0_BASE || address >= (MBK_SLOT0_BASE + MBK_SLOT_SIZE)) &&
-        (address < MBK_SLOT1_BASE || address >= (MBK_SLOT1_BASE + MBK_SLOT_SIZE))) {
+    if (!address_is_writable(address)) {
         fprintf(stderr, "Mock Flash: Write out of bounds at 0x%p\n", (void*)address);
         return -1;
     }
@@ -120,19 +195,13 @@ int hal_flash_erase_sector(uintptr_t address)
         return -1;
     }
 
-    if ((address < MBK_DATA_BASE || address >= (MBK_DATA_BASE + MBK_BLOCK_SIZE * 2)) &&
-        (address < TANEUE_PROGRESS_BASE || address >= (TANEUE_PROGRESS_BASE + TANEUE_PROGRESS_SIZE)) &&
-        (address < MBK_SLOT0_BASE || address >= (MBK_SLOT0_BASE + MBK_SLOT_SIZE)) &&
-        (address < MBK_SLOT1_BASE || address >= (MBK_SLOT1_BASE + MBK_SLOT_SIZE))) {
+    if (!address_is_writable(address)) {
         fprintf(stderr, "Mock Flash: Erase out of bounds at 0x%p\n", (void*)address);
         return -1;
     }
     /* Align to sector boundary */
     uintptr_t sector_addr = (address / MOCK_FLASH_SECTOR_SIZE) * MOCK_FLASH_SECTOR_SIZE;
-    uintptr_t sector_end = sector_addr + MOCK_FLASH_SECTOR_SIZE;
-    if ((sector_addr < (MBK_DATA_BASE + MBK_BLOCK_SIZE * 2) && (MBK_DATA_BASE + MBK_BLOCK_SIZE * 2) < sector_end) &&
-        (sector_addr < (MBK_SLOT0_BASE + MBK_SLOT_SIZE) && (MBK_SLOT0_BASE + MBK_SLOT_SIZE) < sector_end) &&
-        (sector_addr < (MBK_SLOT1_BASE + MBK_SLOT_SIZE) && (MBK_SLOT1_BASE + MBK_SLOT_SIZE) < sector_end)) {
+    if (!sector_range_is_erasable(sector_addr)) {
         fprintf(stderr, "Mock Flash: Erase out of bounds (addr=0x%p)\n", (void*)address);
         return -1;
     }
@@ -151,7 +220,8 @@ int hal_flash_erase_all(void)
         return -1;
     }
 
-    memset((void*)MBK_DATA_BASE, 0xFF, MBK_BLOCK_SIZE * 2);
+    memset((void*)MBK_DATA0_BASE, 0xFF, MBK_BLOCK_SIZE);
+    memset((void*)MBK_DATA1_BASE, 0xFF, MBK_BLOCK_SIZE);
     memset((void*)TANEUE_PROGRESS_BASE, 0xFF, TANEUE_PROGRESS_SIZE);
     memset((void*)MBK_SLOT0_BASE, 0xFF, MBK_SLOT_SIZE);
     memset((void*)MBK_SLOT1_BASE, 0xFF, MBK_SLOT_SIZE);
@@ -165,22 +235,30 @@ bool mock_flash_reset(void)
 {
     static bool initialized = false;
     if (!initialized) {
-        if (map_memory(MOCK_META_REGION_START, MOCK_META_REGION_SIZE) != (void*)MOCK_META_REGION_START) {
-            fprintf(stderr, "Mock Flash: Failed to map meta region at 0x%p\n",
-                    (void*)MOCK_META_REGION_START);
+        if (!map_memory_once(MBK_DATA0_BASE, MBK_BLOCK_SIZE)) {
+            fprintf(stderr, "Mock Flash: Failed to map bfl sector 0 at 0x%p\n", (void*)MBK_DATA0_BASE);
             return false;
         }
-        if (map_memory(MBK_SLOT0_BASE, MBK_SLOT_SIZE) != (void *)MBK_SLOT0_BASE) {
+        if (!map_memory_once(MBK_DATA1_BASE, MBK_BLOCK_SIZE)) {
+            fprintf(stderr, "Mock Flash: Failed to map bfl sector 1 at 0x%p\n", (void*)MBK_DATA1_BASE);
+            return false;
+        }
+        if (!map_memory_once(TANEUE_PROGRESS_BASE, TANEUE_PROGRESS_SIZE)) {
+            fprintf(stderr, "Mock Flash: Failed to map progress area at 0x%p\n", (void*)TANEUE_PROGRESS_BASE);
+            return false;
+        }
+        if (!map_memory_once(MBK_SLOT0_BASE, MBK_SLOT_SIZE)) {
             fprintf(stderr, "Mock Flash: Failed to map slot 0 at 0x%p\n", (void*)MBK_SLOT0_BASE);
             return false;
         }
-        if (map_memory(MBK_SLOT1_BASE, MBK_SLOT_SIZE) != (void *)MBK_SLOT1_BASE) {
+        if (!map_memory_once(MBK_SLOT1_BASE, MBK_SLOT_SIZE)) {
             fprintf(stderr, "Mock Flash: Failed to map slot 1 at 0x%p\n", (void*)MBK_SLOT1_BASE);
             return false;
         }
         initialized = true;
     }
-    memset((void*)MBK_DATA_BASE, 0xFF, MBK_BLOCK_SIZE * 2);
+    memset((void*)MBK_DATA0_BASE, 0xFF, MBK_BLOCK_SIZE);
+    memset((void*)MBK_DATA1_BASE, 0xFF, MBK_BLOCK_SIZE);
     memset((void*)TANEUE_PROGRESS_BASE, 0xFF, TANEUE_PROGRESS_SIZE);
     memset((void*)MBK_SLOT0_BASE, 0xFF, MBK_SLOT_SIZE);
     memset((void*)MBK_SLOT1_BASE, 0xFF, MBK_SLOT_SIZE);
@@ -192,10 +270,7 @@ bool mock_flash_reset(void)
 
 void mock_flash_set_memory(uintptr_t address, const void* data, size_t size)
 {
-    if (!((MBK_DATA_BASE <= address && address < (MBK_DATA_BASE + MBK_BLOCK_SIZE * 2)) ||
-          (TANEUE_PROGRESS_BASE <= address && address < (TANEUE_PROGRESS_BASE + TANEUE_PROGRESS_SIZE)) ||
-          (MBK_SLOT0_BASE <= address && address < (MBK_SLOT0_BASE + MBK_SLOT_SIZE)) ||
-          (MBK_SLOT1_BASE <= address && address < (MBK_SLOT1_BASE + MBK_SLOT_SIZE)))) {
+    if (!address_is_writable(address)) {
         fprintf(stderr, "Mock Flash: Write out of bounds at 0x%p\n", (void*)address);
         return;
     }

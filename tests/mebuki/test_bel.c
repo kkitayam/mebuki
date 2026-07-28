@@ -301,9 +301,9 @@ void test_hal_flash_read_write(void)
     uint8_t write_data[4] = {0x11, 0x22, 0x33, 0x44};
 
     TEST_ASSERT_EQUAL(0, hal_flash_init());
-    TEST_ASSERT_EQUAL(0, hal_flash_erase_sector(MBK_DATA_BASE));
-    TEST_ASSERT_EQUAL(0, hal_flash_write(MBK_DATA_BASE, write_data, sizeof(write_data)));
-    const uint8_t* read_view = (const uint8_t*)MBK_DATA_BASE;
+    TEST_ASSERT_EQUAL(0, hal_flash_erase_sector(MBK_DATA0_BASE));
+    TEST_ASSERT_EQUAL(0, hal_flash_write(MBK_DATA0_BASE, write_data, sizeof(write_data)));
+    const uint8_t* read_view = (const uint8_t*)MBK_DATA0_BASE;
     TEST_ASSERT_EQUAL_MEMORY(write_data, read_view, sizeof(write_data));
 }
 
@@ -311,8 +311,8 @@ void test_hal_flash_erase(void)
 {
     uint8_t data[16];
 
-    hal_flash_erase_sector(MBK_DATA_BASE);
-    const uint8_t* read_view = (const uint8_t*)MBK_DATA_BASE;
+    hal_flash_erase_sector(MBK_DATA0_BASE);
+    const uint8_t* read_view = (const uint8_t*)MBK_DATA0_BASE;
     TEST_ASSERT_NOT_NULL(read_view);
     memcpy(data, read_view, sizeof(data));
 
