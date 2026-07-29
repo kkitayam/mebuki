@@ -33,10 +33,6 @@ tests = [
     'name' : 'test_bsl',
     'src'  : 'test_bsl.c',
   },
-  {
-    'name' : 'test_taneue',
-    'src'  : 'test_taneue.c',
-  },
 ]
 
 foreach t : tests
@@ -47,4 +43,16 @@ foreach t : tests
     build_by_default : false
   )
   test(t['name'], exe, suite : 'mebuki')
+endforeach
+
+# Run the taneue test suite under each wear optimization policy.
+foreach policy : ['TANEUE_WEAR_OPT_PRIMARY', 'TANEUE_WEAR_OPT_BALANCED']
+  name = 'test_taneue_' + policy.to_lower().replace('taneue_wear_opt_', '')
+  exe = executable(name, ['test_taneue.c'] + common_sources,
+    include_directories : common_includes,
+    dependencies : [mebuki_dep, unity_dep],
+    c_args : test_c_args + ['-DTANEUE_WEAR_OPT=' + policy],
+    build_by_default : false
+  )
+  test(name, exe, suite : 'mebuki')
 endforeach

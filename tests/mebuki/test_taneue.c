@@ -288,6 +288,53 @@ void test_taneue_swap_if_scheduled_returns_flash_error_on_progress_write_failure
     TEST_ASSERT_EQUAL(TANEUE_ERROR_FLASH, taneue_swap_if_scheduled());
 }
 
+/*
+ * Under TANEUE_WEAR_OPT_PRIMARY the alignment and finalize phases only
+ * erase sectors in the Secondary Slot (SLOT_A = Slot1).  The Primary Slot
+ * (SLOT_B = Slot0) receives exactly one erase per swapped sector from
+ * swap step2 and nothing more.
+ *
+ * Under TANEUE_WEAR_OPT_BALANCED the roles are reversed: alignment and
+ * finalize erases fall on the Primary Slot (SLOT_A = Slot0), and the
+ * Secondary Slot (SLOT_B = Slot1) receives only the step2 erases.
+ *
+ * Both tests use endpoint=3.  Step2 runs for sectors 0..3, producing
+ * exactly 4 erases on SLOT_B and none on SLOT_B from any other phase.
+ */
+#if TANEUE_WEAR_OPT == TANEUE_WEAR_OPT_PRIMARY
+void test_taneue_wear_primary_alignment_erases_secondary(void)
+{
+    const size_t endpoint = 3U;
+
+    setup_slots_for_endpoint(endpoint);
+    TEST_ASSERT_EQUAL(TANEUE_SUCCESS, taneue_schedule_swap());
+
+    mock_flash_reset_stats();
+    TEST_ASSERT_EQUAL(TANEUE_SUCCESS, taneue_swap_if_scheduled());
+
+    /* Slot0 (SLOT_B) receives only step2 erases: one per sector in [0..endpoint]. */
+    TEST_ASSERT_EQUAL(endpoint + 1U,
+                      mock_flash_count_erases_in_range(MBK_SLOT0_BASE, MBK_SLOT_SIZE));
+}
+#endif
+
+#if TANEUE_WEAR_OPT == TANEUE_WEAR_OPT_BALANCED
+void test_taneue_wear_balanced_alignment_erases_primary(void)
+{
+    const size_t endpoint = 3U;
+
+    setup_slots_for_endpoint(endpoint);
+    TEST_ASSERT_EQUAL(TANEUE_SUCCESS, taneue_schedule_swap());
+
+    mock_flash_reset_stats();
+    TEST_ASSERT_EQUAL(TANEUE_SUCCESS, taneue_swap_if_scheduled());
+
+    /* Slot1 (SLOT_B) receives only step2 erases: one per sector in [0..endpoint]. */
+    TEST_ASSERT_EQUAL(endpoint + 1U,
+                      mock_flash_count_erases_in_range(MBK_SLOT1_BASE, MBK_SLOT_SIZE));
+}
+#endif
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -304,6 +351,13 @@ int main(void)
     RUN_TEST(test_taneue_swap_if_scheduled_completes_swap_for_e3);
     RUN_TEST(test_taneue_swap_if_scheduled_resumes_from_mid_progress_prefix);
     RUN_TEST(test_taneue_swap_if_scheduled_returns_flash_error_on_progress_write_failure);
+
+#if TANEUE_WEAR_OPT == TANEUE_WEAR_OPT_PRIMARY
+    RUN_TEST(test_taneue_wear_primary_alignment_erases_secondary);
+#endif
+#if TANEUE_WEAR_OPT == TANEUE_WEAR_OPT_BALANCED
+    RUN_TEST(test_taneue_wear_balanced_alignment_erases_primary);
+#endif
 
     return UNITY_END();
 }

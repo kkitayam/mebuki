@@ -55,6 +55,15 @@ uint32_t mock_flash_get_write_count(void);
 uint32_t mock_flash_get_erase_count(void);
 
 /**
+ * @brief Count erase operations that fell within the given address range
+ *        since the last mock_flash_reset_stats() call.
+ * @param[in] base  Start address of the range (inclusive)
+ * @param[in] size  Size of the range in bytes
+ * @return Number of erase sector calls whose sector address is in [base, base+size)
+ */
+uint32_t mock_flash_count_erases_in_range(uintptr_t base, size_t size);
+
+/**
  * @brief Reset the statistics
  */
 void mock_flash_reset_stats(void);

@@ -16,6 +16,30 @@ extern "C" {
 #endif
 
 /* =========================================================================
+ * Wear optimization policy
+ * ========================================================================= */
+
+/*
+ * Controls which slot absorbs the extra erase operations from the alignment
+ * and finalize phases of the swap algorithm.
+ *
+ * TANEUE_WEAR_OPT_PRIMARY (default): alignment erases occur on the Secondary
+ *   Slot, protecting the Primary Slot from additional wear.
+ *
+ * TANEUE_WEAR_OPT_BALANCED: alignment erases occur on the Primary Slot,
+ *   distributing wear evenly across both slots over successive swaps.
+ *
+ * The policy is resolved entirely at preprocessing time.
+ * No runtime branching is introduced.
+ */
+#define TANEUE_WEAR_OPT_PRIMARY  0
+#define TANEUE_WEAR_OPT_BALANCED 1
+
+#ifndef TANEUE_WEAR_OPT
+#  define TANEUE_WEAR_OPT TANEUE_WEAR_OPT_PRIMARY
+#endif
+
+/* =========================================================================
  * Public result codes
  * ========================================================================= */
 

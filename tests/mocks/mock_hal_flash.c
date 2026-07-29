@@ -9,6 +9,10 @@ static bool error_injection_enabled = false;
 static uint32_t write_count = 0;
 static uint32_t erase_count = 0;
 
+#define MOCK_FLASH_ERASE_LOG_SIZE 64U
+static uintptr_t erase_log[MOCK_FLASH_ERASE_LOG_SIZE];
+static size_t erase_log_count = 0U;
+
 static bool address_in_range(uintptr_t address, uintptr_t base, size_t size)
 {
     return (address >= base) && (address < (base + size));
@@ -209,6 +213,10 @@ int hal_flash_erase_sector(uintptr_t address)
     /* Fill the sector with 0xFF */
     memset((void*)sector_addr, 0xFF, MOCK_FLASH_SECTOR_SIZE);
 
+    if (erase_log_count < MOCK_FLASH_ERASE_LOG_SIZE) {
+        erase_log[erase_log_count++] = sector_addr;
+    }
+
     erase_count++;
     return 0;
 }
@@ -300,4 +308,18 @@ void mock_flash_reset_stats(void)
 {
     write_count = 0;
     erase_count = 0;
+    erase_log_count = 0U;
+}
+
+uint32_t mock_flash_count_erases_in_range(uintptr_t base, size_t size)
+{
+    uint32_t count = 0U;
+
+    for (size_t i = 0U; i < erase_log_count; ++i) {
+        if (erase_log[i] >= base && erase_log[i] < base + size) {
+            count++;
+        }
+    }
+
+    return count;
 }

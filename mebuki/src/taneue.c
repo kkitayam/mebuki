@@ -20,6 +20,20 @@
 extern int hal_flash_write(uintptr_t address, const void* data, size_t size);
 extern int hal_flash_erase_sector(uintptr_t address);
 
+/*
+ * SLOT_A receives alignment and finalize phase erases.
+ * SLOT_B receives only the step2 erase per swapped sector.
+ */
+#if TANEUE_WEAR_OPT == TANEUE_WEAR_OPT_PRIMARY
+#  define TANEUE_WEAR_SLOT_A_BASE MBK_SLOT1_BASE
+#  define TANEUE_WEAR_SLOT_B_BASE MBK_SLOT0_BASE
+#elif TANEUE_WEAR_OPT == TANEUE_WEAR_OPT_BALANCED
+#  define TANEUE_WEAR_SLOT_A_BASE MBK_SLOT0_BASE
+#  define TANEUE_WEAR_SLOT_B_BASE MBK_SLOT1_BASE
+#else
+#  error "Unknown TANEUE_WEAR_OPT value"
+#endif
+
 enum taneue_progress_state {
     TANEUE_PROGRESS_CLEAN = 0,
     TANEUE_PROGRESS_SCHEDULED,
@@ -255,46 +269,46 @@ STATIC int taneue_find_schedule_endpoint(uint32_t* endpoint_out)
 
 STATIC int taneue_swap_phase_step1(uint32_t i)
 {
-    const uintptr_t dst_slot1 = MBK_SLOT1_BASE + (i + 1U) * MBK_BLOCK_SIZE;
+    const uintptr_t dst = TANEUE_WEAR_SLOT_A_BASE + (i + 1U) * MBK_BLOCK_SIZE;
     int err;
 
-    err = taneue_ensure_erased(dst_slot1);
+    err = taneue_ensure_erased(dst);
     if (err) { return err; }
 
-    return taneue_copy_sector(dst_slot1, MBK_SLOT0_BASE + i * MBK_BLOCK_SIZE);
+    return taneue_copy_sector(dst, TANEUE_WEAR_SLOT_B_BASE + i * MBK_BLOCK_SIZE);
 }
 
 STATIC int taneue_swap_phase_step2(uint32_t i)
 {
-    const uintptr_t dst_slot0 = MBK_SLOT0_BASE + i * MBK_BLOCK_SIZE;
-    const uintptr_t src_slot1 = MBK_SLOT1_BASE + i * MBK_BLOCK_SIZE;
+    const uintptr_t dst = TANEUE_WEAR_SLOT_B_BASE + i * MBK_BLOCK_SIZE;
+    const uintptr_t src = TANEUE_WEAR_SLOT_A_BASE + i * MBK_BLOCK_SIZE;
     int err;
 
-    if (memcmp((const void*)dst_slot0, (const void*)src_slot1, MBK_BLOCK_SIZE) == 0) {
+    if (memcmp((const void*)dst, (const void*)src, MBK_BLOCK_SIZE) == 0) {
         return TANEUE_SUCCESS;
     }
 
-    err = taneue_ensure_erased(dst_slot0);
+    err = taneue_ensure_erased(dst);
     if (err) { return err; }
 
-    return taneue_copy_sector(dst_slot0, src_slot1);
+    return taneue_copy_sector(dst, src);
 }
 
 STATIC int taneue_align_phase_step(uint32_t i)
 {
-    const uintptr_t dst_slot1 = MBK_SLOT1_BASE + i * MBK_BLOCK_SIZE;
-    const uintptr_t src_slot1 = MBK_SLOT1_BASE + (i + 1U) * MBK_BLOCK_SIZE;
+    const uintptr_t dst = TANEUE_WEAR_SLOT_A_BASE + i * MBK_BLOCK_SIZE;
+    const uintptr_t src = TANEUE_WEAR_SLOT_A_BASE + (i + 1U) * MBK_BLOCK_SIZE;
     int err;
 
-    err = taneue_ensure_erased(dst_slot1);
+    err = taneue_ensure_erased(dst);
     if (err) { return err; }
 
-    return taneue_copy_sector(dst_slot1, src_slot1);
+    return taneue_copy_sector(dst, src);
 }
 
 STATIC int taneue_finalize_phase(uint32_t endpoint)
 {
-    return taneue_ensure_erased(MBK_SLOT1_BASE + (endpoint + 1U) * MBK_BLOCK_SIZE);
+    return taneue_ensure_erased(TANEUE_WEAR_SLOT_A_BASE + (endpoint + 1U) * MBK_BLOCK_SIZE);
 }
 
 STATIC int taneue_execute_from_step(uint32_t endpoint, uint32_t completed_steps)
