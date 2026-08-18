@@ -35,6 +35,10 @@
  * Implementation
  * ========================================================================== */
 
+void hal_flash_init(void)
+{
+}
+
 int hal_flash_read(uint32_t addr, void* buf, size_t len)
 {
     if (buf == NULL) {

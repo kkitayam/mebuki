@@ -2,23 +2,18 @@
 /* Copyright (c) 2026 Koji KITAYAMA */
 #include <stdint.h>
 #include <stdbool.h>
-#include <stdio.h>
-#include <stdarg.h>
+#include <stddef.h>
 
 #include "uart.h"
 #include "system.h"
+#include "flash.h"
 
 #include "mebuki.h"
 #include "taneue.h"
 
 void uart_printf(const char* fmt, ...)
 {
-    va_list args;
-    va_start(args, fmt);
-    char buffer[512];
-    vsnprintf(buffer, sizeof(buffer), fmt, args);
-    uart_puts(buffer);
-    va_end(args);
+    uart_puts(fmt);
 }
 
 static void put_hex(uint32_t value, bool put_leading_zero)
@@ -36,6 +31,38 @@ static void put_hex(uint32_t value, bool put_leading_zero)
         uint8_t nibble = (value >> (i * 4)) & 0x0F;
         uart_putc(nibble < 10 ? '0' + nibble : 'A' + (nibble - 10));
     }
+}
+
+static void put_dec(uint32_t value)
+{
+    char buffer[10];
+    size_t index = 0;
+
+    if (value == 0U) {
+        uart_putc('0');
+        return;
+    }
+
+    while (value > 0U) {
+        buffer[index++] = (char)('0' + (value % 10U));
+        value /= 10U;
+    }
+    while (index > 0U) {
+        uart_putc(buffer[--index]);
+    }
+}
+
+static void put_error_code(const char* message, int code)
+{
+    uart_puts(message);
+    if (code < 0) {
+        uart_putc('-');
+        put_dec((uint32_t)(-code));
+    } else {
+        put_dec((uint32_t)code);
+    }
+    uart_putc(')');
+    uart_puts("\r\n");
 }
 
 #if 0
@@ -75,17 +102,18 @@ int main(void)
     uart_puts("swap slots if needed...\r\n");
     enum taneue_result err = taneue_swap_if_scheduled();
     if (err != TANEUE_SUCCESS) {
-        uart_printf("ERROR: Failed to perform scheduled slot swap (code: %d)\r\n", (int)err);
+        put_error_code("ERROR: Failed to perform scheduled slot swap (code: ", (int)err);
         halt();
     }
 
     uart_puts("Initializing mebuki...\r\n");
+    hal_flash_init();
 
     struct mbk_context ctx;
     enum mbk_result result = mbk_init(&ctx);
 
     if (result != MBK_SUCCESS) {
-        uart_printf("ERROR: mbk_init failed (code: %d)\r\n", (int)result);
+        put_error_code("ERROR: mbk_init failed (code: ", (int)result);
         halt();
     }
 
@@ -95,7 +123,7 @@ int main(void)
     result = mbk_find_bootable_slot(&ctx, &boot_info);
 
     if (result != MBK_SUCCESS) {
-        uart_printf("ERROR: No bootable slot found (code: %d)\r\n", (int)result);
+        put_error_code("ERROR: No bootable slot found (code: ", (int)result);
         halt();
     }
 
@@ -139,7 +167,7 @@ int main(void)
         uart_puts("Scheduling slot swap...\r\n");
         enum taneue_result result = taneue_schedule_swap();
         if (result != TANEUE_SUCCESS) {
-            uart_printf("ERROR: Failed to schedule slot swap (code: %d)\r\n", (int)result);
+            put_error_code("ERROR: Failed to schedule slot swap (code: ", (int)result);
             halt();
         }
         uart_puts("Slot swap scheduled\r\n");

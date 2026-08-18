@@ -80,7 +80,8 @@ Configure a cross build.
 uv run meson setup builddir \
     --cross-file cross/arm-none-eabi-gcc.ini \
     -Dtarget=renode-cm4 \
-    -Dsvl=fndsa
+    -Dsvl=fndsa \
+    -Daccel=auto
 ```
 
 Build and run the first example.
@@ -128,6 +129,24 @@ Example:
 
 ```sh
 uv run meson compile -C builddir run_higher_version
+```
+
+## RX261 (Boot only)
+
+RX261 support is for boot software only.
+
+```bash
+uv run meson setup builddir-rx261 \
+    --cross-file cross/rx-elf-gcc.ini \
+    -Dtarget=rx261 \
+    -Dsvl=ecdsa-p256-sha256 \
+    -Daccel=auto \
+    -Dserial_port=COM3
+```
+
+```bash
+uv run meson compile -C builddir-rx261 deploy
+uv run meson compile -C builddir-rx261 run
 ```
 
 ## Run the Unit Tests

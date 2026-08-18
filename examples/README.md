@@ -20,6 +20,8 @@ examples/
 
 Runtime environment (startup, linker, HAL, Renode) is separated into `machines/`.
 
+For `-Dtarget=rx261`, only `boot/` is built.
+
 ## Build
 
 ### Prerequisites

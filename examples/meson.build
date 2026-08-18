@@ -3,7 +3,7 @@ if not sign_algorithms.has_key(verification)
   error('Unsupported SVL: @0@'.format(verification))
 endif
 
-if machine_name != 'renode-cm4'
+if machine_name != 'renode-cm4' and machine_name != 'rx261'
   error('Unsupported machine for examples: @0@'.format(machine_name))
 endif
 
@@ -43,5 +43,8 @@ endforeach
 sign_algo = sign_algorithms[verification]
 
 subdir('boot')
-subdir('app')
-subdir('usecases')
+
+if machine_name == 'renode-cm4'
+  subdir('app')
+  subdir('usecases')
+endif

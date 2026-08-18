@@ -9,4 +9,6 @@ if target_option == 'all' or target_option == 'renode-cm4' or target_option == '
     warning('target=cm4 is deprecated. use target=renode-cm4')
   endif
   subdir('renode-cm4')
+elif target_option == 'rx261'
+  subdir('rx261')
 endif

@@ -3,6 +3,14 @@ mebuki SVL implementation using ECDSA P-256 and SHA-256.
 
 - [BearSSL](https://bearssl.org/)
 
+## Hardware acceleration (RX261 RSIP)
+
+`-Daccel` controls RSIP usage for `-Dtarget=rx261`.
+
+- `-Daccel=auto`: use RSIP when initialization succeeds; otherwise use software (BearSSL).
+- `-Daccel=enabled`: require RSIP; configuration fails on non-RX261 targets.
+- `-Daccel=disabled`: always use software.
+
 ## Public Keys Configuration
 
 The SVL implementation requires public keys for signature verification. These keys are injected at compile time through a configurable header file.

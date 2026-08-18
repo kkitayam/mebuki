@@ -5,6 +5,7 @@ This directory contains the implementations of execution environments (Machines)
 ## Supported Machines
 
 - `renode-cm4`: Reference environment running on Renode for Cortex-M4
+- `rx261`: RX261 real board environment (boot only)
 
 ## Responsibilities of the Machine
 

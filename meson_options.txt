@@ -1,12 +1,23 @@
 option('target',
   type: 'combo',
-  choices: ['all', 'renode-cm4', 'cm4'],
+  choices: ['all', 'renode-cm4', 'cm4', 'rx261'],
   value: 'all',
-  description: 'Target machine to build (all, renode-cm4)',
+  description: 'Target machine to build (all, renode-cm4, rx261)',
 )
 option('svl',
   type: 'combo',
   choices: ['fndsa', 'ecdsa-p256-sha256'],
   value: 'fndsa',
   description: 'Signature Verification Layer'
+)
+option('accel',
+  type: 'combo',
+  choices: ['auto', 'enabled', 'disabled'],
+  value: 'auto',
+  description: 'Hardware acceleration for ecdsa-p256-sha256 (auto/enabled/disabled)',
+)
+option('serial_port',
+  type: 'string',
+  value: '',
+  description: 'Serial port for RX261 run target (e.g., COM3)',
 )

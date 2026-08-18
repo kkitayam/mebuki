@@ -83,7 +83,8 @@ uv pip install git+https://github.com/kkitayam/mebuki-sign.git
 uv run meson setup builddir \
     --cross-file cross/arm-none-eabi-gcc.ini \
     -Dtarget=renode-cm4 \
-    -Dsvl=fndsa
+    -Dsvl=fndsa \
+    -Daccel=auto
 
 uv run meson compile -C builddir run_slot0
 ```

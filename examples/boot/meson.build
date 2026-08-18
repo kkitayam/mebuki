@@ -40,6 +40,60 @@ boot_bin = custom_target(
   build_by_default: false,
 )
 
+if machine_name == 'rx261'
+  rfp_cli = find_program('rfp-cli')
+  python_exe = find_program('python3', 'python', required: true)
+  serial_port_option = get_option('serial_port')
+
+  boot_srec = custom_target(
+    'boot_srec',
+    input: boot_exe,
+    output: boot_exe.name() + '.s32',
+    command: [objcopy, '-O', 'srec', '@INPUT@', '@OUTPUT@'],
+    build_by_default: true,
+  )
+
+  run_target(
+    'deploy',
+    command: [
+      rfp_cli,
+      '-d', 'RX200',
+      '-t', 'e2l',
+      '-if', 'fine',
+      '-a',
+      boot_srec,
+    ],
+  )
+
+  if serial_port_option == ''
+    error('serial_port option must be specified for RX261 run target. Use -Dserial_port=<port>')
+  endif
+
+  run_script = meson.project_source_root() / 'machines' / 'rx261' / 'scripts' / 'run.py'
+  run_target(
+    'run',
+    command: [
+      python_exe,
+      run_script,
+      serial_port_option,
+      '--build-dir', meson.current_build_dir(),
+      '--rfp-cli', rfp_cli,
+      '--display',
+    ],
+  )
+
+  run_target(
+    'run-capture',
+    command: [
+      python_exe,
+      run_script,
+      serial_port_option,
+      '--build-dir', meson.current_build_dir(),
+      '--rfp-cli', rfp_cli,
+    ],
+  )
+endif
+
 run_target(
   'boot_size',
   command: [
