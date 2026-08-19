@@ -81,7 +81,7 @@ uv run meson setup builddir \
     --cross-file cross/arm-none-eabi-gcc.ini \
     -Dtarget=renode-cm4 \
     -Dsvl=fndsa \
-    -Daccel=auto
+    -Daccel=disabled
 ```
 
 Build and run the first example.
@@ -140,7 +140,6 @@ uv run meson setup builddir-rx261 \
     --cross-file cross/rx-elf-gcc.ini \
     -Dtarget=rx261 \
     -Dsvl=ecdsa-p256-sha256 \
-    -Daccel=auto \
     -Dserial_port=COM3
 ```
 

@@ -1,15 +1,10 @@
 # mebuki-svl-ecdsa-p256-sha256
 mebuki SVL implementation using ECDSA P-256 and SHA-256.
 
-- [BearSSL](https://bearssl.org/)
+Uses [BearSSL](https://bearssl.org/) for all cryptographic operations.
 
-## Hardware acceleration (RX261 RSIP)
-
-`-Daccel` controls RSIP usage for `-Dtarget=rx261`.
-
-- `-Daccel=auto`: use RSIP when initialization succeeds; otherwise use software (BearSSL).
-- `-Daccel=enabled`: require RSIP; configuration fails on non-RX261 targets.
-- `-Daccel=disabled`: always use software.
+For hardware-accelerated ECDSA on RX261 using the RSIP engine,
+use `verification/ecdsa-p256-sha256-rsip/` with `-Dsvl=ecdsa-p256-sha256-rsip`.
 
 ## Public Keys Configuration
 

@@ -14,7 +14,7 @@ option('accel',
   type: 'combo',
   choices: ['auto', 'enabled', 'disabled'],
   value: 'auto',
-  description: 'Hardware acceleration for ecdsa-p256-sha256 (auto/enabled/disabled)',
+  description: 'Hardware acceleration for ecdsa-p256-sha256: auto=use RSIP when target=rx261, enabled=require RSIP, disabled=always software',
 )
 option('serial_port',
   type: 'string',
