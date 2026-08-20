@@ -15,7 +15,6 @@ extern "C" {
 
 /* Mock Flash configuration */
 #define MOCK_FLASH_SIZE         (1024U * 1024U)
-#define MOCK_FLASH_SECTOR_SIZE  4096U
 #define MOCK_FLASH_PAGE_SIZE    256U
 
 int hal_flash_init(void);

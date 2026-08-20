@@ -34,19 +34,20 @@
  */
 #define MBK_FLASH_PAGE_SIZE     256U
 
-/* Flash erase block size in bytes.
- *
- * Requirements:
- *   - Must be a multiple of 16.
- *   - Used as the erase and block copy unit.
- */
-#define MBK_BLOCK_SIZE          4096U
+/* Flash erase block size for BFL sectors in bytes. */
+#define MBK_BLOCK_SIZE_BFL      4096U
+
+/* Flash erase block size for slot sectors in bytes. */
+#define MBK_BLOCK_SIZE_SLOT     4096U
+
+/* Flash erase block size for the progress area in bytes. */
+#define MBK_BLOCK_SIZE_PROGRESS 4096U
 
 /* Base address of BFL sector 0. */
 #define MBK_DATA0_BASE          BFL_BASE
 
 /* Base address of BFL sector 1. */
-#define MBK_DATA1_BASE          (BFL_BASE + MBK_BLOCK_SIZE)
+#define MBK_DATA1_BASE          (BFL_BASE + MBK_BLOCK_SIZE_BFL)
 
 /* ============================================================================
  * Firmware slots
@@ -56,7 +57,7 @@
  * Base address of Slot 0.
  *
  * Requirements:
- *   - Must be aligned to MBK_BLOCK_SIZE.
+ *   - Must be aligned to MBK_BLOCK_SIZE_SLOT.
  *   - The implementation performs direct header loads and sector operations.
  */
 #define MBK_SLOT0_BASE          SLOT0_BASE
@@ -64,7 +65,7 @@
 /* Base address of Slot 1.
  *
  * Requirements:
- *   - Must be aligned to MBK_BLOCK_SIZE.
+ *   - Must be aligned to MBK_BLOCK_SIZE_SLOT.
  *   - The implementation performs direct header loads and sector operations.
  */
 #define MBK_SLOT1_BASE          SLOT1_BASE

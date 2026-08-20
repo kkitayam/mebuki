@@ -75,20 +75,22 @@ static_assert(MBK_SLOT_SIZE > MBK_HEADER_SIZE + MBK_SIGNATURE_SIZE,
  * Block alignment guarantees the minimum alignment required by the
  * implementation for direct structure accesses.
  */
-static_assert((MBK_BLOCK_SIZE % 16U) == 0U,
-              "MBK_BLOCK_SIZE must be a multiple of 16 (min 16-byte alignment)");
-static_assert((MBK_BLOCK_SIZE % MBK_FLASH_PAGE_SIZE) == 0U,
-              "MBK_BLOCK_SIZE must be a multiple of MBK_FLASH_PAGE_SIZE");
-static_assert((MBK_DATA0_BASE % MBK_BLOCK_SIZE) == 0U,
-              "MBK_DATA0_BASE must be MBK_BLOCK_SIZE aligned");
-static_assert((MBK_DATA1_BASE % MBK_BLOCK_SIZE) == 0U,
-              "MBK_DATA1_BASE must be MBK_BLOCK_SIZE aligned");
-static_assert((MBK_SLOT0_BASE % MBK_BLOCK_SIZE) == 0U,
-              "MBK_SLOT0_BASE must be MBK_BLOCK_SIZE aligned");
-static_assert((MBK_SLOT1_BASE % MBK_BLOCK_SIZE) == 0U,
-              "MBK_SLOT1_BASE must be MBK_BLOCK_SIZE aligned");
-static_assert((MBK_SLOT_SIZE % MBK_BLOCK_SIZE) == 0U,
-              "MBK_SLOT_SIZE must be multiple of MBK_BLOCK_SIZE");
+static_assert((MBK_BLOCK_SIZE_BFL % 16U) == 0U,
+              "MBK_BLOCK_SIZE_BFL must be a multiple of 16 (min 16-byte alignment)");
+static_assert((MBK_BLOCK_SIZE_SLOT % 16U) == 0U,
+              "MBK_BLOCK_SIZE_SLOT must be a multiple of 16 (min 16-byte alignment)");
+static_assert((MBK_BLOCK_SIZE_SLOT % MBK_FLASH_PAGE_SIZE) == 0U,
+              "MBK_BLOCK_SIZE_SLOT must be a multiple of MBK_FLASH_PAGE_SIZE");
+static_assert((MBK_DATA0_BASE % MBK_BLOCK_SIZE_BFL) == 0U,
+              "MBK_DATA0_BASE must be MBK_BLOCK_SIZE_BFL aligned");
+static_assert((MBK_DATA1_BASE % MBK_BLOCK_SIZE_BFL) == 0U,
+              "MBK_DATA1_BASE must be MBK_BLOCK_SIZE_BFL aligned");
+static_assert((MBK_SLOT0_BASE % MBK_BLOCK_SIZE_SLOT) == 0U,
+              "MBK_SLOT0_BASE must be MBK_BLOCK_SIZE_SLOT aligned");
+static_assert((MBK_SLOT1_BASE % MBK_BLOCK_SIZE_SLOT) == 0U,
+              "MBK_SLOT1_BASE must be MBK_BLOCK_SIZE_SLOT aligned");
+static_assert((MBK_SLOT_SIZE % MBK_BLOCK_SIZE_SLOT) == 0U,
+              "MBK_SLOT_SIZE must be multiple of MBK_BLOCK_SIZE_SLOT");
 static_assert((MBK_DATA0_BASE % 16U) == 0U,
               "MBK_DATA0_BASE must be at least 16-byte aligned");
 static_assert((MBK_DATA1_BASE % 16U) == 0U,
@@ -130,7 +132,7 @@ struct mbk_bfl_entry {
 
 struct mbk_bfl_sector {
     struct mbk_bfl_entry entry;                                      /* Active record. */
-    uint8_t reserved[MBK_BLOCK_SIZE - sizeof(struct mbk_bfl_entry)]; /* Pad to one erase block. */
+    uint8_t reserved[MBK_BLOCK_SIZE_BFL - sizeof(struct mbk_bfl_entry)]; /* Pad to one erase block. */
 };
 
 enum mbk_bfl_result {
@@ -169,7 +171,7 @@ struct mbk_record_update {
 static_assert(sizeof(struct mbk_boot_history) == 8, "struct mbk_boot_history must be 8 bytes");
 static_assert(sizeof(mbk_image_hash) == MBK_HASH_SIZE, "mbk_image_hash must be 32 bytes");
 static_assert(sizeof(struct mbk_header) == MBK_HEADER_SIZE, "struct mbk_header must be 8 bytes");
-static_assert(sizeof(struct mbk_bfl_entry) <= MBK_BLOCK_SIZE,
+static_assert(sizeof(struct mbk_bfl_entry) <= MBK_BLOCK_SIZE_BFL,
                "struct mbk_bfl_entry must fit in one flash sector");
 static_assert(sizeof(struct mbk_context) >= sizeof(struct mbk_bfl_entry),
                "struct mbk_context must be large enough to hold struct mbk_bfl_entry");

@@ -37,20 +37,20 @@
 #  define MBK_FLASH_PAGE_SIZE       256U
 #endif
 
-/*
- * Flash erase block size in bytes.
- *
- * Requirements:
- *   - Must be a multiple of 16.
- *   - Used as the erase and block copy unit.
- */
-#define MBK_BLOCK_SIZE              4096U
+/* Flash erase block size for BFL sectors in bytes. */
+#define MBK_BLOCK_SIZE_BFL          4096U
+
+/* Flash erase block size for slot sectors in bytes. */
+#define MBK_BLOCK_SIZE_SLOT         4096U
+
+/* Flash erase block size for the Taneue progress area in bytes. */
+#define MBK_BLOCK_SIZE_PROGRESS     4096U
 
 /*
  * Base address of BFL sector 0.
  *
  * Requirements:
- *   - Must be aligned to MBK_BLOCK_SIZE.
+ *   - Must be aligned to MBK_BLOCK_SIZE_BFL.
  *   - The implementation performs direct loads from aligned structures.
  */
 #define MBK_DATA0_BASE              0x08000000U
@@ -71,7 +71,7 @@
  * Base address of Slot 0.
  *
  * Requirements:
- *   - Must be aligned to MBK_BLOCK_SIZE.
+ *   - Must be aligned to MBK_BLOCK_SIZE_SLOT.
  *   - The implementation performs direct header loads and sector operations.
  */
 #define MBK_SLOT0_BASE              0x08010000U
@@ -86,7 +86,7 @@
 /*
  * Slot size in bytes.
  *
- * Must be a multiple of MBK_BLOCK_SIZE.
+ * Must be a multiple of MBK_BLOCK_SIZE_SLOT.
  */
 #define MBK_SLOT_SIZE               0x00010000U  /* 64 KiB */
 
@@ -102,20 +102,20 @@
  * Base address of the Taneue progress area.
  *
  * Requirements:
- *   - Must be aligned to MBK_BLOCK_SIZE.
+ *   - Must be aligned to MBK_BLOCK_SIZE_PROGRESS.
  *   - The implementation directly loads uint16_t progress fields.
  */
 #define TANEUE_PROGRESS_BASE        \
-    (((MBK_DATA0_BASE > MBK_DATA1_BASE) ? MBK_DATA0_BASE : MBK_DATA1_BASE) + MBK_BLOCK_SIZE)
+    (((MBK_DATA0_BASE > MBK_DATA1_BASE) ? MBK_DATA0_BASE : MBK_DATA1_BASE) + MBK_BLOCK_SIZE_BFL)
 
 /*
  * Size of the Taneue progress area in bytes, including the header.
  *
  * Requirements:
  *   - Minimum size: 3N + 2 bytes.
- *   - Must be a multiple of MBK_BLOCK_SIZE.
+ *   - Must be a multiple of MBK_BLOCK_SIZE_PROGRESS.
  */
-#define TANEUE_PROGRESS_SIZE        MBK_BLOCK_SIZE
+#define TANEUE_PROGRESS_SIZE        MBK_BLOCK_SIZE_PROGRESS
 
 
 /* =========================================================================

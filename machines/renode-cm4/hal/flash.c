@@ -2,8 +2,18 @@
 /* Copyright (c) 2026 Koji KITAYAMA */
 
 #include "flash.h"
-#include "target_config.h"
+#include "mebuki_config.h"
+#include <stdbool.h>
 #include <string.h>
+
+#ifndef TANEUE_PROGRESS_BASE
+#  define TANEUE_PROGRESS_BASE \
+      (((MBK_DATA0_BASE > MBK_DATA1_BASE) ? MBK_DATA0_BASE : MBK_DATA1_BASE) + MBK_BLOCK_SIZE_BFL)
+#endif
+
+#ifndef TANEUE_PROGRESS_SIZE
+#  define TANEUE_PROGRESS_SIZE MBK_BLOCK_SIZE_PROGRESS
+#endif
 
 /**
  * Renode's MappedMemory is writable and simulates Flash characteristics:
@@ -27,9 +37,37 @@
 #define IS_FLASH_RANGE(addr, len) \
     (IS_FLASH_ADDR(addr) && IS_FLASH_ADDR((addr) + (len) - 1))
 
-/* Check if the address is sector-aligned */
-#define IS_SECTOR_ALIGNED(addr) \
-    (((addr) & (MBK_BLOCK_SIZE - 1)) == 0)
+struct flash_region {
+    uint32_t base;
+    size_t size;
+    size_t erase_size;
+};
+
+static bool in_region(uint32_t addr, const struct flash_region* region)
+{
+    const uint32_t end = region->base + (uint32_t)region->size;
+    return addr >= region->base && addr < end;
+}
+
+static bool flash_region_for_address(uint32_t addr, struct flash_region* out)
+{
+    const struct flash_region regions[] = {
+        {MBK_DATA0_BASE, MBK_BLOCK_SIZE_BFL, MBK_BLOCK_SIZE_BFL},
+        {MBK_DATA1_BASE, MBK_BLOCK_SIZE_BFL, MBK_BLOCK_SIZE_BFL},
+        {TANEUE_PROGRESS_BASE, TANEUE_PROGRESS_SIZE, MBK_BLOCK_SIZE_PROGRESS},
+        {MBK_SLOT0_BASE, MBK_SLOT_SIZE, MBK_BLOCK_SIZE_SLOT},
+        {MBK_SLOT1_BASE, MBK_SLOT_SIZE, MBK_BLOCK_SIZE_SLOT},
+    };
+
+    for (size_t i = 0; i < (sizeof(regions) / sizeof(regions[0])); i++) {
+        if (in_region(addr, &regions[i])) {
+            *out = regions[i];
+            return true;
+        }
+    }
+
+    return false;
+}
 
 /* ============================================================================
  * Implementation
@@ -93,20 +131,34 @@ int hal_flash_write(uint32_t addr, const void* data, size_t len)
 
 int hal_flash_erase_sector(uint32_t addr)
 {
+    struct flash_region region;
+
     /* Parameter validation */
     if (!IS_FLASH_ADDR(addr)) {
         return -1;
     }
 
-    if (!IS_SECTOR_ALIGNED(addr)) {
+    if (!flash_region_for_address(addr, &region)) {
+        return -1;
+    }
+
+    if (((size_t)(addr - region.base) % region.erase_size) != 0U) {
+        return -1;
+    }
+
+    if (!IS_FLASH_RANGE(addr, region.erase_size)) {
+        return -1;
+    }
+
+    if (((uintptr_t)addr + region.erase_size) > ((uintptr_t)region.base + region.size)) {
         return -1;
     }
 
     /* Fill the entire sector with 0xFF */
-    memset((void*)addr, 0xFF, MBK_BLOCK_SIZE);
+    memset((void*)addr, 0xFF, region.erase_size);
 
     /* Verify */
-    for (size_t i = 0; i < MBK_BLOCK_SIZE; i++) {
+    for (size_t i = 0; i < region.erase_size; i++) {
         if (((unsigned char*)addr)[i] != 0xFF) {
             return -1;
         }

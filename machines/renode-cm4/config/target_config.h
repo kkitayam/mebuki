@@ -67,7 +67,7 @@
  * Parameters
  * ========================================================================== */
 
-/* Flash error handling */
-#define MBK_BLOCK_SIZE      4096U          /* Flash erase unit */
+/* Flash erase unit in bytes */
+#define FLASH_ERASE_SIZE    4096U
 
 #endif /* TARGET_CONFIG_H */

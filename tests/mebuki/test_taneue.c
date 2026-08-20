@@ -8,7 +8,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#define TANEUE_SECTOR_COUNT (MBK_SLOT_SIZE / MBK_BLOCK_SIZE)
+#define TANEUE_SECTOR_COUNT (MBK_SLOT_SIZE / MBK_BLOCK_SIZE_SLOT)
 #define TANEUE_RESERVED_INDEX (TANEUE_SECTOR_COUNT - 1U)
 #define TANEUE_PROGRESS_HEADER_SIZE (sizeof(uint16_t) * 2U)
 #define TANEUE_MAX_PROGRESS_STEPS ((3U * (TANEUE_SECTOR_COUNT - 1U)) + 1U)
@@ -24,12 +24,12 @@ enum taneue_result taneue_mark_step_done(size_t step_index);
 
 static uintptr_t slot0_sector(size_t i)
 {
-    return MBK_SLOT0_BASE + ((uintptr_t)i * (uintptr_t)MBK_BLOCK_SIZE);
+    return MBK_SLOT0_BASE + ((uintptr_t)i * (uintptr_t)MBK_BLOCK_SIZE_SLOT);
 }
 
 static uintptr_t slot1_sector(size_t i)
 {
-    return MBK_SLOT1_BASE + ((uintptr_t)i * (uintptr_t)MBK_BLOCK_SIZE);
+    return MBK_SLOT1_BASE + ((uintptr_t)i * (uintptr_t)MBK_BLOCK_SIZE_SLOT);
 }
 
 static void fill_sector(uintptr_t addr, uint8_t value)
@@ -39,7 +39,7 @@ static void fill_sector(uintptr_t addr, uint8_t value)
     memset(page, value, sizeof(page));
     TEST_ASSERT_EQUAL(0, hal_flash_erase_sector(addr));
 
-    for (size_t offset = 0; offset < MBK_BLOCK_SIZE; offset += MBK_FLASH_PAGE_SIZE) {
+    for (size_t offset = 0; offset < MBK_BLOCK_SIZE_SLOT; offset += MBK_FLASH_PAGE_SIZE) {
         TEST_ASSERT_EQUAL(0, hal_flash_write(addr + (uintptr_t)offset, page, sizeof(page)));
     }
 }

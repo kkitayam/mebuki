@@ -54,14 +54,14 @@ struct taneue_progress_scan {
  */
 #ifndef TANEUE_PROGRESS_BASE
 #  define TANEUE_PROGRESS_BASE \
-      (((MBK_DATA0_BASE > MBK_DATA1_BASE) ? MBK_DATA0_BASE : MBK_DATA1_BASE) + MBK_BLOCK_SIZE)
+      (((MBK_DATA0_BASE > MBK_DATA1_BASE) ? MBK_DATA0_BASE : MBK_DATA1_BASE) + MBK_BLOCK_SIZE_BFL)
 #endif
 
 #ifndef TANEUE_PROGRESS_SIZE
-#  define TANEUE_PROGRESS_SIZE MBK_BLOCK_SIZE
+#  define TANEUE_PROGRESS_SIZE MBK_BLOCK_SIZE_PROGRESS
 #endif
 
-#define TANEUE_SECTOR_COUNT (MBK_SLOT_SIZE / MBK_BLOCK_SIZE)
+#define TANEUE_SECTOR_COUNT (MBK_SLOT_SIZE / MBK_BLOCK_SIZE_SLOT)
 #define TANEUE_PROGRESS_HEADER_SIZE (sizeof(uint16_t) * 2U)
 #define TANEUE_PROGRESS_STEPS_OFFSET TANEUE_PROGRESS_HEADER_SIZE
 #define TANEUE_PROGRESS_STEP_COUNT_MAX ((3U * (TANEUE_SECTOR_COUNT - 1U)) + 1U)
@@ -71,13 +71,13 @@ static_assert(TANEUE_SECTOR_COUNT >= 5U,
               "taneue requires at least 5 sectors per slot");
 static_assert((TANEUE_SECTOR_COUNT - 1U) <= UINT16_MAX,
               "taneue endpoint must fit in uint16_t");
-static_assert((TANEUE_PROGRESS_SIZE % MBK_BLOCK_SIZE) == 0U,
-              "TANEUE_PROGRESS_SIZE must be a multiple of MBK_BLOCK_SIZE");
+static_assert((TANEUE_PROGRESS_SIZE % MBK_BLOCK_SIZE_PROGRESS) == 0U,
+              "TANEUE_PROGRESS_SIZE must be a multiple of MBK_BLOCK_SIZE_PROGRESS");
 static_assert(TANEUE_PROGRESS_SIZE >=
                   (TANEUE_PROGRESS_STEPS_OFFSET + TANEUE_PROGRESS_STEP_COUNT_MAX),
               "TANEUE_PROGRESS_SIZE must fit taneue progress header and steps");
-static_assert((TANEUE_PROGRESS_BASE % MBK_BLOCK_SIZE) == 0U,
-              "TANEUE_PROGRESS_BASE must be MBK_BLOCK_SIZE (sector) aligned");
+static_assert((TANEUE_PROGRESS_BASE % MBK_BLOCK_SIZE_PROGRESS) == 0U,
+              "TANEUE_PROGRESS_BASE must be MBK_BLOCK_SIZE_PROGRESS (sector) aligned");
 static_assert((TANEUE_PROGRESS_BASE % 16U) == 0U,
               "TANEUE_PROGRESS_BASE must be at least 16-byte aligned");
 
@@ -91,7 +91,7 @@ static_assert((TANEUE_PROGRESS_BASE + TANEUE_PROGRESS_SIZE) <= MBK_SLOT1_BASE ||
 STATIC bool taneue_sector_is_erased(uintptr_t address)
 {
     const uint32_t* p = (const uint32_t*)address;
-    const uint32_t* const end = p + (MBK_BLOCK_SIZE / sizeof(*p));
+    const uint32_t* const end = p + (MBK_BLOCK_SIZE_SLOT / sizeof(*p));
 
     while (p < end) {
         if (*p++ != 0xFFFFFFFFU) {
@@ -111,7 +111,7 @@ STATIC int taneue_erase_progress_area(void)
         if (hal_flash_erase_sector(address) != 0) {
             return TANEUE_ERROR_FLASH;
         }
-        address += MBK_BLOCK_SIZE;
+        address += MBK_BLOCK_SIZE_PROGRESS;
     }
 
     return TANEUE_SUCCESS;
@@ -214,7 +214,7 @@ STATIC int taneue_ensure_erased(uintptr_t address)
 STATIC int taneue_copy_sector(uintptr_t dst, uintptr_t src)
 {
     const uint8_t* src_bytes = (const uint8_t*)src;
-    const uint8_t* const end = src_bytes + MBK_BLOCK_SIZE;
+    const uint8_t* const end = src_bytes + MBK_BLOCK_SIZE_SLOT;
     uint8_t page[MBK_FLASH_PAGE_SIZE];
     uintptr_t dst_address = dst;
 
@@ -232,12 +232,12 @@ STATIC int taneue_copy_sector(uintptr_t dst, uintptr_t src)
 
 STATIC uint32_t taneue_detect_endpoint(void)
 {
-    uintptr_t slot0_address = MBK_SLOT0_BASE + TANEUE_SECTOR_COUNT * MBK_BLOCK_SIZE;
-    uintptr_t slot1_address = MBK_SLOT1_BASE + TANEUE_SECTOR_COUNT * MBK_BLOCK_SIZE;
+    uintptr_t slot0_address = MBK_SLOT0_BASE + TANEUE_SECTOR_COUNT * MBK_BLOCK_SIZE_SLOT;
+    uintptr_t slot1_address = MBK_SLOT1_BASE + TANEUE_SECTOR_COUNT * MBK_BLOCK_SIZE_SLOT;
 
     for (uint32_t i = TANEUE_SECTOR_COUNT; i > 0U; --i) {
-        slot0_address -= MBK_BLOCK_SIZE;
-        slot1_address -= MBK_BLOCK_SIZE;
+        slot0_address -= MBK_BLOCK_SIZE_SLOT;
+        slot1_address -= MBK_BLOCK_SIZE_SLOT;
         if (!taneue_sector_is_erased(slot0_address) ||
             !taneue_sector_is_erased(slot1_address)) {
             return i - 1U;
@@ -251,8 +251,8 @@ STATIC int taneue_find_schedule_endpoint(uint32_t* endpoint_out)
 {
     const uint32_t reserved_index = TANEUE_SECTOR_COUNT - 1U;
     const uint32_t endpoint = taneue_detect_endpoint();
-    const uintptr_t slot0_reserved = MBK_SLOT0_BASE + reserved_index * MBK_BLOCK_SIZE;
-    const uintptr_t slot1_reserved = MBK_SLOT1_BASE + reserved_index * MBK_BLOCK_SIZE;
+    const uintptr_t slot0_reserved = MBK_SLOT0_BASE + reserved_index * MBK_BLOCK_SIZE_SLOT;
+    const uintptr_t slot1_reserved = MBK_SLOT1_BASE + reserved_index * MBK_BLOCK_SIZE_SLOT;
 
     if (!taneue_sector_is_erased(slot0_reserved) ||
         !taneue_sector_is_erased(slot1_reserved)) {
@@ -269,22 +269,22 @@ STATIC int taneue_find_schedule_endpoint(uint32_t* endpoint_out)
 
 STATIC int taneue_swap_phase_step1(uint32_t i)
 {
-    const uintptr_t dst = TANEUE_WEAR_SLOT_A_BASE + (i + 1U) * MBK_BLOCK_SIZE;
+    const uintptr_t dst = TANEUE_WEAR_SLOT_A_BASE + (i + 1U) * MBK_BLOCK_SIZE_SLOT;
     int err;
 
     err = taneue_ensure_erased(dst);
     if (err) { return err; }
 
-    return taneue_copy_sector(dst, TANEUE_WEAR_SLOT_B_BASE + i * MBK_BLOCK_SIZE);
+    return taneue_copy_sector(dst, TANEUE_WEAR_SLOT_B_BASE + i * MBK_BLOCK_SIZE_SLOT);
 }
 
 STATIC int taneue_swap_phase_step2(uint32_t i)
 {
-    const uintptr_t dst = TANEUE_WEAR_SLOT_B_BASE + i * MBK_BLOCK_SIZE;
-    const uintptr_t src = TANEUE_WEAR_SLOT_A_BASE + i * MBK_BLOCK_SIZE;
+    const uintptr_t dst = TANEUE_WEAR_SLOT_B_BASE + i * MBK_BLOCK_SIZE_SLOT;
+    const uintptr_t src = TANEUE_WEAR_SLOT_A_BASE + i * MBK_BLOCK_SIZE_SLOT;
     int err;
 
-    if (memcmp((const void*)dst, (const void*)src, MBK_BLOCK_SIZE) == 0) {
+    if (memcmp((const void*)dst, (const void*)src, MBK_BLOCK_SIZE_SLOT) == 0) {
         return TANEUE_SUCCESS;
     }
 
@@ -296,8 +296,8 @@ STATIC int taneue_swap_phase_step2(uint32_t i)
 
 STATIC int taneue_align_phase_step(uint32_t i)
 {
-    const uintptr_t dst = TANEUE_WEAR_SLOT_A_BASE + i * MBK_BLOCK_SIZE;
-    const uintptr_t src = TANEUE_WEAR_SLOT_A_BASE + (i + 1U) * MBK_BLOCK_SIZE;
+    const uintptr_t dst = TANEUE_WEAR_SLOT_A_BASE + i * MBK_BLOCK_SIZE_SLOT;
+    const uintptr_t src = TANEUE_WEAR_SLOT_A_BASE + (i + 1U) * MBK_BLOCK_SIZE_SLOT;
     int err;
 
     err = taneue_ensure_erased(dst);
@@ -308,7 +308,7 @@ STATIC int taneue_align_phase_step(uint32_t i)
 
 STATIC int taneue_finalize_phase(uint32_t endpoint)
 {
-    return taneue_ensure_erased(TANEUE_WEAR_SLOT_A_BASE + (endpoint + 1U) * MBK_BLOCK_SIZE);
+    return taneue_ensure_erased(TANEUE_WEAR_SLOT_A_BASE + (endpoint + 1U) * MBK_BLOCK_SIZE_SLOT);
 }
 
 STATIC int taneue_execute_from_step(uint32_t endpoint, uint32_t completed_steps)

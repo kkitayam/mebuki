@@ -43,7 +43,7 @@ static void invalidate_slot(uintptr_t slot_addr)
 
 static void erase_slot_region(uintptr_t slot_addr)
 {
-    for (uint32_t offset = 0; offset < MBK_SLOT_SIZE; offset += MOCK_FLASH_SECTOR_SIZE) {
+    for (uint32_t offset = 0; offset < MBK_SLOT_SIZE; offset += MBK_BLOCK_SIZE_SLOT) {
         TEST_ASSERT_EQUAL(0, hal_flash_erase_sector(slot_addr + offset));
     }
 }
