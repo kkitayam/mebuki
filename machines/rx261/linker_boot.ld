@@ -39,7 +39,7 @@ SECTIONS
 	.text.ram ALIGN(4) :
 	{
 		__text = .;
-		*(.text.flash_type1_pe_ram)
+		*(.text.*ram)
 		. = ALIGN(4);
 		__etext = .;
 	} > RAM AT > PROM = 0xFF
@@ -72,13 +72,13 @@ SECTIONS
 
 	.bss ALIGN(4) (NOLOAD) :
 	{
-		_bss = .;
+		__bss = .;
 		*(.bss) *(.bss.*)
 		*(.sbss) *(.sbss.*)
 		*(COMMON)
 		. = ALIGN(4);
-		_ebss = .;
-		_end = .;
+		__ebss = .;
+		__end = .;
 	} > RAM
 
 	.mde VECTOR_BASE + 0x0:
@@ -108,5 +108,5 @@ SECTIONS
 }
 
 ASSERT(LOADADDR(.data) + SIZEOF(.data) <= VECTOR_BASE, "Boot image overlaps fixed vectors");
-ASSERT(__usp_limit >= _ebss, "RAM overflow");
+ASSERT(__usp_limit >= __ebss, "RAM overflow");
 ASSERT(SIZEOF(.data) == 0, "Initialized global/static variables are forbidden in the bootloader.");
