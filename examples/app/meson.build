@@ -13,10 +13,10 @@ app_exe = executable(
     machine_hal_dep,
   ],
   link_args: [
-    '-T' + machine_app_linker,
+    '-T' + machine_app_linker[0].full_path(),
     '-Wl,-Map=' + meson.current_build_dir() / 'app.map',
   ],
-  link_depends: machine_app_linker_file,
+  link_depends: machine_app_linker,
   name_suffix: 'elf',
 )
 

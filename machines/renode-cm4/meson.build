@@ -24,10 +24,8 @@ machine_hal_dep = declare_dependency(
 
 machine_boot_startup = files('startup_boot.s')
 machine_app_startup = files('startup_app.s')
-machine_boot_linker_file = files('linker_boot.ld')
-machine_app_linker_file = files('linker_app.ld')
-machine_boot_linker = meson.current_source_dir() / 'linker_boot.ld'
-machine_app_linker = meson.current_source_dir() / 'linker_app.ld'
+machine_boot_linker = files('linker_boot.ld')
+machine_app_linker = files('linker_app.ld')
 
 machine_renode_template = configure_file(
   input: 'renode/renode_common.resc.in',

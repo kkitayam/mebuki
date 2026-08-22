@@ -25,10 +25,10 @@ boot_exe = executable(
     machine_hal_dep,
   ],
   link_args: [
-    '-T' + machine_boot_linker,
+    '-T' + machine_boot_linker[0].full_path(),
     '-Wl,-Map=' + meson.current_build_dir() / 'boot.map',
   ],
-  link_depends: machine_boot_linker_file,
+  link_depends: machine_boot_linker,
   name_suffix: 'elf',
 )
 
