@@ -43,8 +43,8 @@ endforeach
 sign_algo = sign_algorithms[verification]
 
 subdir('boot')
+subdir('app')
 
 if machine_name == 'renode-cm4'
-  subdir('app')
   subdir('usecases')
 endif
