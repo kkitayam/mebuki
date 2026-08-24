@@ -20,7 +20,16 @@ examples/
 
 Runtime environment (startup, linker, HAL, Renode) is separated into `machines/`.
 
-For `-Dtarget=rx261`, only `boot/` is built.
+## Use Cases
+
+Use cases define which application images load into slot0 and slot1.
+Each use case declares only the image selection data.
+Deploy and run logic lives in machine definitions.
+
+### Supported Machines
+
+- **renode-cm4**: All use cases supported. Run targets start Renode simulator.
+- **rx261**: All use cases supported. Run targets deploy images via rfp-cli and run on hardware.
 
 ## Build
 
@@ -28,12 +37,21 @@ For `-Dtarget=rx261`, only `boot/` is built.
 
 - Meson 1.10.0 or newer
 - Ninja
-- `arm-none-eabi` toolchain on `PATH`
+- `arm-none-eabi` toolchain on `PATH` (for renode-cm4)
+- `rx-elf-gcc` toolchain on `PATH` (for rx261)
 
 ### Configure
 
+For Renode (CM4):
+
 ```powershell
 meson setup builddir --cross-file cross/arm-none-eabi-gcc.ini -Dtarget=renode-cm4
+```
+
+For RX261 hardware:
+
+```powershell
+meson setup builddir --cross-file cross/rx-elf-gcc.ini -Dtarget=rx261 -Dserial_port=<port>
 ```
 
 ### Compile
@@ -42,4 +60,5 @@ meson setup builddir --cross-file cross/arm-none-eabi-gcc.ini -Dtarget=renode-cm
 meson compile -C builddir
 ```
 
-Generate `boot.elf`, `app.vX.kY.img` for all Use Cases. `vX` is the version number, `kY` is the key generation number.
+Generates `boot.elf`, `app.vX.kY.img` for all use cases.
+`vX` is the version number, `kY` is the key generation number.

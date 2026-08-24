@@ -131,9 +131,13 @@ Example:
 uv run meson compile -C builddir run_higher_version
 ```
 
-## RX261 (Boot only)
+## RX261 Use Cases
 
-RX261 support is for boot software only.
+RX261 hardware support is available for all use cases.
+
+Verify the serial port is connected first.
+
+Configure the build:
 
 ```bash
 uv run meson setup builddir-rx261 \
@@ -143,10 +147,21 @@ uv run meson setup builddir-rx261 \
     -Dserial_port=COM3
 ```
 
+Run a use case by name.
+Available targets are `run_slot0`, `run_higher_version`, `run_keygen_mix`, and `run_boot_only`.
+
+Example:
+
 ```bash
-uv run meson compile -C builddir-rx261 deploy
-uv run meson compile -C builddir-rx261 run
+uv run meson compile -C builddir-rx261 run_slot0
 ```
+
+This command:
+1. Deploys the boot image and selected app images to flash
+2. Starts the application via rfp-cli
+3. Captures and displays UART logs
+
+The UART console displays output similar to the Renode examples above.
 
 ## Run the Unit Tests
 
