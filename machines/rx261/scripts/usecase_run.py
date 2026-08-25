@@ -22,37 +22,45 @@ def setup_logging(level=logging.INFO):
         format="%(asctime)s - %(levelname)s - %(message)s"
     )
 
-
-def deploy_with_rfp(rfp_cli: str, image_file: str, address: Optional[str] = None) -> bool:
+def deploy_with_rfp(
+    rfp_cli: str,
+    *images: tuple[str, Optional[str]],
+) -> bool:
     """
-    Deploy an image using rfp-cli.
+    Deploy images using rfp-cli.
 
     Args:
         rfp_cli: Path to rfp-cli executable
-        image_file: Path to image file
-        address: Memory address (optional, only for binary files)
+        images: Tuples of image file path and optional memory address.
+            If address is None, the image is specified with -file.
+            Otherwise, the image is specified with -bin.
 
     Returns:
         True if successful, False otherwise
     """
     try:
-        cmd = [rfp_cli, "-d", "RX200", "-t", "e2l", "-if", "fine", "-a", image_file]
-        if address:
-            cmd.extend(["-r", address])
+        cmd = [rfp_cli, "-d", "RX200", "-t", "e2l", "-if", "fine", "-a"]
 
-        logger.info(f"Deploying: {image_file}" + (f" at {address}" if address else ""))
+        for image_file, address in images:
+            if address is None:
+                cmd.extend(["-file", image_file])
+            else:
+                cmd.extend(["-bin", address, image_file])
+
+        logger.info(f"Deploying: {images}")
         result = subprocess.run(cmd, check=True, capture_output=True, text=True)
-        logger.info(f"Deploy successful: {image_file}")
+#        logger.info(result.stdout)
+        logger.info("Deploy successful")
         return True
+
     except subprocess.CalledProcessError as e:
-        logger.error(f"Failed to deploy {image_file}: {e}")
+        logger.error(f"Failed to deploy: {images}")
         logger.error(f"stdout: {e.stdout}")
         logger.error(f"stderr: {e.stderr}")
         return False
     except Exception as e:
-        logger.error(f"Unexpected error deploying {image_file}: {e}")
+        logger.error(f"Unexpected error deploying {images}: {e}")
         return False
-
 
 def run_application(
     python_exe: str,
@@ -116,21 +124,15 @@ def main() -> int:
     setup_logging()
 
     # Deploy boot image
-    if not deploy_with_rfp(args.rfp_cli, args.boot_image):
-        logger.error("Failed to deploy boot image")
-        return 1
-
-    # Deploy slot0 image if provided
+    images_to_deploy = [(args.boot_image, None)]
     if args.slot0_image:
-        if not deploy_with_rfp(args.rfp_cli, args.slot0_image, args.slot0_address):
-            logger.error("Failed to deploy slot0 image")
-            return 1
-
-    # Deploy slot1 image if provided
+        images_to_deploy.append((args.slot0_image, args.slot0_address))
     if args.slot1_image:
-        if not deploy_with_rfp(args.rfp_cli, args.slot1_image, args.slot1_address):
-            logger.error("Failed to deploy slot1 image")
-            return 1
+        images_to_deploy.append((args.slot1_image, args.slot1_address))
+    
+    if not deploy_with_rfp(args.rfp_cli, *images_to_deploy):
+        logger.error("Failed to deploy images")
+        return 1
 
     # Run application
     return run_application(

@@ -7,10 +7,9 @@ MEMORY
 
 ISP_SIZE = 2K;
 USP_SIZE = 4K;
-BOOT_SIZE = 32K;
+SLOT_SIZE = 128K;
 
-BOOT_ORIGIN = ORIGIN(PROM) + LENGTH(PROM) - BOOT_SIZE;
-VECTOR_BASE = 0xFFFFFF80;
+ENTRY_ORIGIN = ORIGIN(PROM) + 8;
 
 __isp_top   = ORIGIN(RAM) + LENGTH(RAM);
 __isp_limit = __isp_top - ISP_SIZE;
@@ -27,6 +26,14 @@ ENTRY(_Reset_Handler)
 
 SECTIONS
 {
+	.reset ENTRY_ORIGIN :
+	{
+		. = ALIGN(4);
+		*(.text.reset)
+		*(.text.system_init)
+		. = ALIGN(4);
+	} > PROM = 0xFF
+
 	. = ORIGIN(RAM);
 	.text.ram ALIGN(4) :
 	{
@@ -37,7 +44,7 @@ SECTIONS
 	} > RAM AT > PROM = 0xFF
 	__text_load = LOADADDR(.text.ram);
 
-	. = ORIGIN(PROM) + SIZEOF(.text.ram);
+	. = ENTRY_ORIGIN + SIZEOF(.reset) + SIZEOF(.text.ram);
 	.text ALIGN(4) :
 	{
 		*(.text) *(.text.*)
@@ -149,3 +156,4 @@ SECTIONS
 }
 
 ASSERT(__usp_limit >= __ebss, "RAM overflow");
+ASSERT(__edata < ORIGIN(PROM) + SLOT_SIZE , "Firmware image overlaps the next slot");
