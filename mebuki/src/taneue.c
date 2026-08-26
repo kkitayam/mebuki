@@ -368,17 +368,17 @@ int taneue_schedule_swap(void)
 
     if (scan.state != TANEUE_PROGRESS_CLEAN) {
         err = taneue_erase_progress_area();
-        if (err) { return err; }
+        if (err) { MBK_LOG("fail to erase progress area\n"); return err; }
     }
 
     err = taneue_find_schedule_endpoint(&endpoint);
     if (err) { return err; }
 
     err = taneue_progress_write_u16(0U, (uint16_t)endpoint);
-    if (err) { return err; }
+    if (err) { MBK_LOG("fail to write schedule endpoint\n"); return err; }
 
     err = taneue_progress_write_u16(sizeof(uint16_t), (uint16_t)~(uint16_t)endpoint);
-    if (err) { return err; }
+    if (err) { MBK_LOG("fail to write schedule endpoint complement\n"); return err; }
 
     return TANEUE_SUCCESS;
 }
@@ -389,6 +389,7 @@ int taneue_swap_if_scheduled(void)
     int err;
 
     if (scan.state == TANEUE_PROGRESS_CORRUPT) {
+        MBK_LOG("taneue progress area is corrupt\n");
         return taneue_erase_progress_area();
     }
 
@@ -401,15 +402,14 @@ int taneue_swap_if_scheduled(void)
 
         if (scan.completed_steps > total_steps) {
             err = taneue_erase_progress_area();
-            if (err) { return err; }
+            if (err) { MBK_LOG("fail to erase progress area\n"); return err; }
             return TANEUE_ERROR_INVALID_STATE;
         }
 
         if (scan.completed_steps < total_steps) {
             err = taneue_execute_from_step(scan.endpoint, scan.completed_steps);
-            if (err) { return err; }
+            if (err) { MBK_LOG("fail to execute from step\n"); return err; }
         }
     }
-
     return taneue_erase_progress_area();
 }

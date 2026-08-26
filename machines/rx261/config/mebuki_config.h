@@ -12,8 +12,8 @@
 
 #define MBK_FLASH_PAGE_SIZE     8U
 #define MBK_BLOCK_SIZE_BFL      256U
-#define MBK_BLOCK_SIZE_SLOT     256U
-#define MBK_BLOCK_SIZE_PROGRESS 2048U
+#define MBK_BLOCK_SIZE_SLOT     2048U
+#define MBK_BLOCK_SIZE_PROGRESS 256U
 
 #define MBK_DATA0_BASE          BFL_BASE
 #define MBK_DATA1_BASE          (BFL_BASE + MBK_BLOCK_SIZE_BFL)
@@ -26,11 +26,9 @@
 #define MBK_SLOT_SIZE           SLOT0_SIZE
 #define MBK_HEADER_SIZE         8U
 
-#define MBK_ENABLE_LOG
-
 #ifdef MBK_ENABLE_LOG
-extern void uart_printf(const char* fmt, ...);
-#  define MBK_LOG(...)  uart_printf(__VA_ARGS__)
+extern void uart_puts(const char*);
+#  define MBK_LOG(msg)  uart_puts(msg)
 #else
 #  define MBK_LOG(msg)  ((void)0)
 #endif

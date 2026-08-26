@@ -21,10 +21,6 @@
 #define FLASH_BASE          0x00000000U
 #define FLASH_SIZE          0x00100000U    /* 1MB */
 
-/* Boot Software section */
-#define BOOT_BASE           0x00000000U
-#define BOOT_SIZE           0x00010000U    /* 64KB */
-
 /* Boot Flash Layer (BFL) data section */
 #define BFL_BASE            0x00010000U
 #define BFL_SIZE            0x00004000U    /* 16KB */

@@ -93,6 +93,7 @@ int main(void)
 {
     system_init();
     uart_init();
+    hal_flash_init();
 
     uart_puts("\r\n");
     uart_puts("==================================================\r\n");
@@ -107,7 +108,6 @@ int main(void)
     }
 
     uart_puts("Initializing mebuki...\r\n");
-    hal_flash_init();
 
     struct mbk_context ctx;
     enum mbk_result result = mbk_init(&ctx);

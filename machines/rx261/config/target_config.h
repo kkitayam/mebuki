@@ -7,14 +7,11 @@
 #define FLASH_BASE          0xFFF80000U
 #define FLASH_SIZE          0x00080000U
 
-#define BOOT_BASE           0xFFFF8000U
-#define BOOT_SIZE           0x00008000U
+#define BFL_BASE            0x00100000U
+#define BFL_SIZE            0x00000100U
 
-#define BFL_BASE            0xFFFF0000U
-#define BFL_SIZE            0x00001000U
-
-#define PROGRESS_BASE       0xFFFF1000U
-#define PROGRESS_SIZE       0x00000800U
+#define PROGRESS_BASE       0x00100400U
+#define PROGRESS_SIZE       0x00000400U
 
 #define SLOT0_BASE          0xFFF80000U
 #define SLOT0_SIZE          0x00020000U
