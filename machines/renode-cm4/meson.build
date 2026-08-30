@@ -26,15 +26,3 @@ machine_boot_startup = files('startup_boot.s')
 machine_app_startup = files('startup_app.s')
 machine_boot_linker = files('linker_boot.ld')
 machine_app_linker = files('linker_app.ld')
-
-machine_renode_template = configure_file(
-  input: 'renode/renode_common.resc.in',
-  output: 'renode_common.resc.in',
-  copy: true,
-)
-configure_file(
-  input: 'renode/platform.repl',
-  output: 'platform.repl',
-  copy: true,
-)
-machine_platform_repl = meson.current_build_dir() / 'platform.repl'

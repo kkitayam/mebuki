@@ -48,37 +48,40 @@ subdir('app')
 subdir('usecases')
 
 if machine_name == 'renode-cm4'
+  python_exe = find_program('python3', 'python', required: true)
+  renode = find_program('renode', required: false)
+  usecase_run_script = meson.project_source_root() / 'machines' / 'renode-cm4' / 'scripts' / 'usecase_run.py'
+
+  if not renode.found()
+    warning('renode not found. Renode use case run targets will look for it at runtime.')
+  endif
+
   foreach usecase : all_usecases
-    conf = configuration_data()
-    conf.set('GDB_PORT', '3333')
-    conf.set('PLATFORM_REPL', machine_platform_repl)
-    conf.set('BOOT_ELF', boot_exe.full_path())
+    cmd = [
+      python_exe,
+      usecase_run_script,
+      '--boot-image', boot_exe.full_path(),
+      '--build-dir', meson.current_build_dir(),
+      '--display',
+    ]
 
-    load_app_lines = ''
+    if renode.found()
+      cmd += ['--renode', renode]
+    endif
+
     if usecase['has_slot0']
-      load_app_lines += 'sysbus LoadBinary @' + usecase['slot0'].full_path() + ' ' + machine_slot0_address
+      cmd += ['--slot0-image', usecase['slot0'].full_path()]
+      cmd += ['--slot0-address', machine_slot0_address]
     endif
+
     if usecase['has_slot1']
-      if load_app_lines != ''
-        load_app_lines += '\n'
-      endif
-      load_app_lines += 'sysbus LoadBinary @' + usecase['slot1'].full_path() + ' ' + machine_slot1_address
+      cmd += ['--slot1-image', usecase['slot1'].full_path()]
+      cmd += ['--slot1-address', machine_slot1_address]
     endif
-
-    conf.set('LOAD_APP_LINES', load_app_lines)
-
-    resc_file = configure_file(
-      input: machine_renode_template,
-      output: usecase['name'] + '.resc',
-      configuration: conf,
-    )
 
     run_target(
       'run_' + usecase['name'],
-      command: [
-        'renode',
-        resc_file,
-      ],
+      command: cmd,
       depends: usecase['depends'],
     )
   endforeach
