@@ -26,13 +26,22 @@ static inline void __enable_irq(void)
     __asm__ volatile("cpsie i" : : : "memory");
 }
 
+static inline void enable_fpu(void)
+{
+    volatile uint32_t* const cpacr = (volatile uint32_t*)0xE000ED88U;
+
+    *cpacr |= (0xFU << 20);
+    __asm__ volatile("dsb");
+    __asm__ volatile("isb");
+}
+
 void _init(void) {
     /* A dummy function for C runtime initialization */
 }
 
 void system_init(void)
 {
-    /* System initialization code can be added here if needed */
+    enable_fpu();
 }
 
 void system_reset(void)
