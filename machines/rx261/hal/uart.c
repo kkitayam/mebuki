@@ -62,6 +62,20 @@ void uart_putc(char c)
     SCI12.TDR = c;
 }
 
+int uart_getc_timeout(uint32_t timeout_ms)
+{
+    uint32_t remaining = timeout_ms * 16000U;
+
+    while (remaining > 0U) {
+        if (SCI12.SSR.BIT.RDRF != 0) {
+            return (int)SCI12.RDR;
+        }
+        remaining--;
+    }
+
+    return -1;
+}
+
 void uart_puts(const char *str)
 {
     if (str == NULL) return;

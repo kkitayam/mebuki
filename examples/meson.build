@@ -44,7 +44,7 @@ sign_algo = sign_algorithms[verification]
 
 subdir('boot')
 subdir('app')
-if machine_name == 'renode-cm4'
+if machine_name == 'renode-cm4' or machine_name == 'rx261'
   subdir('app_ota')
 endif
 

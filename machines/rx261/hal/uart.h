@@ -5,9 +5,10 @@
 #define UART_H
 
 #include <stddef.h>
+#include <stdint.h>
 
 /*
- * UART (PL011) Hardware Abstraction Layer
+ * SCI12 UART Hardware Abstraction Layer
  *
  * Provides transmission functionality for the PL011 UART
  * - Polling only (interrupts disabled)
@@ -31,6 +32,14 @@ void uart_init(void);
  * Wait until there is space in the TX FIFO before sending
  */
 void uart_putc(char c);
+
+/*
+ * Receive one character (polling).
+ *
+ * Returns a byte in the range 0-255, or -1 when no byte is received before
+ * timeout_ms elapses.
+ */
+int uart_getc_timeout(uint32_t timeout_ms);
 
 /*
  * Send a string (polling)

@@ -18,7 +18,7 @@ examples/
 ```
 
 - `boot/`, `app/`: Reference implementations of boot and application software
-- `app_ota/`: Renode-only YMODEM OTA receiver that writes a signed image to slot1
+- `app_ota/`: YMODEM OTA receiver that writes a signed image to slot1
 - `usecases/`: Use case definitions (independent `meson.build`)
 
 Runtime environment (startup, linker, HAL, Renode) is separated into `machines/`.

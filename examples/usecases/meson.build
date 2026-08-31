@@ -40,7 +40,7 @@ all_usecases += [{
   'has_slot1': usecase_has_slot1,
 }]
 
-if machine_name == 'renode-cm4'
+if machine_name == 'renode-cm4' or machine_name == 'rx261'
   subdir('ota')
   all_usecases += [{
     'name': usecase_name,

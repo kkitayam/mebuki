@@ -7,6 +7,7 @@
 #include <string.h>
 
 #include "flash.h"
+#include "mebuki_config.h"
 #include "uart.h"
 
 #define YM_SOH 0x01
@@ -115,6 +116,25 @@ static bool parse_size(const uint8_t *packet, size_t packet_size, size_t *size)
     return true;
 }
 
+static int write_packet(uint8_t *destination, const uint8_t *data, size_t length)
+{
+    const size_t aligned_length = length - (length % MBK_FLASH_PAGE_SIZE);
+    if (aligned_length > 0U &&
+        hal_flash_write((uintptr_t)destination, data, aligned_length) != 0) {
+        return -1;
+    }
+
+    if (aligned_length == length) {
+        return 0;
+    }
+
+    uint8_t final_page[MBK_FLASH_PAGE_SIZE];
+    memset(final_page, 0xFF, sizeof(final_page));
+    memcpy(final_page, data + aligned_length, length - aligned_length);
+    return hal_flash_write(
+        (uintptr_t)(destination + aligned_length), final_page, sizeof(final_page));
+}
+
 int32_t ymodem_receive(uint8_t *buf, size_t buf_size, char *filename)
 {
     if (buf == NULL || buf_size == 0U) {
@@ -201,7 +221,7 @@ int32_t ymodem_receive(uint8_t *buf, size_t buf_size, char *filename)
 
         const size_t remaining = file_size - received;
         const size_t to_copy = remaining < (size_t)length ? remaining : (size_t)length;
-        if (hal_flash_write((uint32_t)(uintptr_t)(buf + received), packet, to_copy) != 0) {
+        if (write_packet(buf + received, packet, to_copy) != 0) {
             uart_putc(YM_CAN);
             uart_putc(YM_CAN);
             return -5;
