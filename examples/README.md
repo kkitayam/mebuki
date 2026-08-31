@@ -70,12 +70,12 @@ For Renode, run the OTA demonstration with `meson compile -C builddir run_ota`.
 It loads `app_ota` in slot0, sends the signed version 2 application image over
 the Renode UART socket, and verifies boot-driven promotion from slot1 to slot0.
 
-For RX261, deploy `app_ota` in slot0, then send a signed application image with
-the YMODEM sender from the adjacent `ymodem_test` repository:
+For RX261, run the OTA demonstration with `meson compile -C builddir run_ota`.
+The run target deploys `app_ota`, waits for its UART banner, and sends the
+signed version 2 application image over the configured serial port.
 
 ```powershell
-uv run python ..\ymodem_test\python\ymodem_sender.py <serial-port> `
-  builddir\examples\app\app.v2.k0.img
+uv run meson compile -C builddir run_ota
 ```
 
 The RX261 receiver programs code flash in 8-byte units. It pads only the final

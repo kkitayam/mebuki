@@ -69,6 +69,8 @@ def run_application(
     build_dir: str,
     rfp_cli: str,
     display: bool = False,
+    ymodem_image: Optional[str] = None,
+    duration: int = 5,
 ) -> int:
     """
     Run the application using the run.py script.
@@ -94,6 +96,9 @@ def run_application(
         ]
         if display:
             cmd.append("--display")
+        if ymodem_image:
+            cmd.extend(["--ymodem-image", ymodem_image])
+        cmd.extend(["--duration", str(duration)])
 
         logger.info(f"Starting application")
         result = subprocess.run(cmd)
@@ -119,6 +124,8 @@ def main() -> int:
     parser.add_argument("--python-exe", required=True, help="Path to python executable")
     parser.add_argument("--run-script", required=True, help="Path to run.py script")
     parser.add_argument("--display", action="store_true", help="Display UART logs to stdout")
+    parser.add_argument("--ymodem-image", help="Signed image to send after the app_ota banner")
+    parser.add_argument("--duration", type=int, default=5, help="Run duration in seconds")
 
     args = parser.parse_args()
     setup_logging()
@@ -142,6 +149,8 @@ def main() -> int:
         args.build_dir,
         args.rfp_cli,
         args.display,
+        args.ymodem_image,
+        args.duration,
     )
 
 

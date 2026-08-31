@@ -129,6 +129,12 @@ elif machine_name == 'rx261'
           cmd += ['--slot1-image', usecase['slot1'].full_path()]
           cmd += ['--slot1-address', machine_slot1_address]
         endif
+        if usecase['name'] == 'ota'
+          cmd += [
+            '--ymodem-image', app_images[2][0].full_path(),
+            '--duration', '30',
+          ]
+        endif
 
         run_target(
           'run_' + usecase['name'],
