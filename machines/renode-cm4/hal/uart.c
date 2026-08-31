@@ -29,6 +29,9 @@
 /** @brief TX FIFO Empty flag */
 #define UART_FR_TXFE    (1U << 7)
 
+/** @brief TX FIFO Full flag */
+#define UART_FR_TXFF    (1U << 5)
+
 /** @brief RX FIFO Full flag */
 #define UART_FR_RXFF    (1U << 6)
 
@@ -102,12 +105,30 @@ void uart_putc(char c)
      * Wait until there is space in the TX FIFO
      * PL011 polling transmission
      */
-    while ((UART_FR & UART_FR_TXFE) == 0) {
+    while ((UART_FR & UART_FR_TXFF) != 0U) {
         /* TX FIFO is full */
     }
 
     /* Write to the data register */
     UART_DR = (unsigned char)c;
+}
+
+int uart_getc_timeout(uint32_t timeout_ms)
+{
+    /*
+     * The CPU runs at 32 MHz in this target.  This polling budget leaves room
+     * for the loop body while preserving the millisecond timeout contract.
+     */
+    uint32_t remaining = timeout_ms * 8000U;
+
+    while (remaining > 0U) {
+        if ((UART_FR & UART_FR_RXFE) == 0U) {
+            return (int)UART_DR;
+        }
+        remaining--;
+    }
+
+    return -1;
 }
 
 void uart_puts(const char* str)

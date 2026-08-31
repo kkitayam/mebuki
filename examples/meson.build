@@ -44,6 +44,9 @@ sign_algo = sign_algorithms[verification]
 
 subdir('boot')
 subdir('app')
+if machine_name == 'renode-cm4'
+  subdir('app_ota')
+endif
 
 subdir('usecases')
 
@@ -77,6 +80,12 @@ if machine_name == 'renode-cm4'
     if usecase['has_slot1']
       cmd += ['--slot1-image', usecase['slot1'].full_path()]
       cmd += ['--slot1-address', machine_slot1_address]
+    endif
+    if usecase['name'] == 'ota'
+      cmd += [
+        '--ymodem-image', app_images[2][0].full_path(),
+        '--duration', '30',
+      ]
     endif
 
     run_target(

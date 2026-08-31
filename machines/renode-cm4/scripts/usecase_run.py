@@ -21,6 +21,8 @@ import time
 from pathlib import Path
 from typing import IO, Optional
 
+from ymodem_sender import ymodem_send
+
 logger = logging.getLogger(__name__)
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -30,6 +32,7 @@ SOCKET_WAIT_TIMEOUT_S = 30
 SOCKET_RETRY_INTERVAL_S = 0.1
 RENODE_QUIT_TIMEOUT_S = 5
 UART_RECV_TIMEOUT_S = 0.2
+OTA_COMPLETION_TIMEOUT_S = 120
 
 
 def setup_logging(level: int = logging.INFO) -> None:
@@ -152,6 +155,8 @@ class UartReader:
         self._display = display
         self._stop = threading.Event()
         self._error: Optional[BaseException] = None
+        self._received = bytearray()
+        self._received_condition = threading.Condition()
         self._thread = threading.Thread(target=self._run, name="uart-reader", daemon=True)
 
     def start(self) -> None:
@@ -162,6 +167,37 @@ class UartReader:
         """Signal the reader to stop and wait for it to finish."""
         self._stop.set()
         self._thread.join(timeout=2)
+
+    def read(self, size: int = 1, timeout: float = 0.0) -> bytes:
+        """Read captured UART bytes, waiting up to timeout seconds."""
+        deadline = time.monotonic() + timeout
+        with self._received_condition:
+            while not self._received and not self._stop.is_set():
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    return b""
+                self._received_condition.wait(remaining)
+            data = bytes(self._received[:size])
+            del self._received[:size]
+            return data
+
+    def write(self, data: bytes) -> None:
+        """Write bytes to the UART socket."""
+        self._sock.sendall(data)
+
+    def flush(self) -> None:
+        """Provide the serial transport flush interface."""
+
+    def wait_for(self, marker: bytes, timeout: float) -> bool:
+        """Wait until marker has appeared in UART output."""
+        deadline = time.monotonic() + timeout
+        with self._received_condition:
+            while marker not in self._received and not self._stop.is_set():
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    return False
+                self._received_condition.wait(remaining)
+            return marker in self._received
 
     @property
     def failed(self) -> bool:
@@ -194,6 +230,9 @@ class UartReader:
 
                 self._log_file.write(data)
                 self._log_file.flush()
+                with self._received_condition:
+                    self._received.extend(data)
+                    self._received_condition.notify_all()
 
                 if self._display:
                     try:
@@ -268,6 +307,7 @@ def run_renode(
     build_dir: Path,
     duration_s: int,
     display: bool,
+    ymodem_image: Optional[Path] = None,
 ) -> int:
     """Start Renode, capture UART, then stop and clean up."""
     uart_log_path = build_dir / "uart.log"
@@ -328,6 +368,24 @@ def run_renode(
         except (OSError, RuntimeError) as exc:
             logger.error("Failed to start the CPU: %s", exc)
             return 1
+
+        if ymodem_image is not None:
+            if not reader.wait_for(b"APP_OTA: waiting for YMODEM image...", 20.0):
+                logger.error("OTA receiver banner was not observed")
+                return 1
+            try:
+                image_data = ymodem_image.read_bytes()
+            except OSError as exc:
+                logger.error("Failed to read OTA image: %s", exc)
+                return 1
+            logger.info("Sending signed OTA image: %s", ymodem_image)
+            if not ymodem_send(reader, image_data, ymodem_image.name):
+                logger.error("YMODEM transfer failed")
+                return 1
+            for marker in (b"APP_OTA: receive OK", b"Slot ID: 1", b"Scheduling slot swap", b"hello world"):
+                if not reader.wait_for(marker, OTA_COMPLETION_TIMEOUT_S):
+                    logger.error("OTA completion marker was not observed: %s", marker.decode())
+                    return 1
 
         deadline = time.monotonic() + duration_s
         while time.monotonic() < deadline:
@@ -391,6 +449,10 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     parser.add_argument("--boot-image", required=True, help="Path to boot ELF image")
     parser.add_argument("--slot0-image", help="Path to slot0 image (optional)")
     parser.add_argument("--slot1-image", help="Path to slot1 image (optional)")
+    parser.add_argument(
+        "--ymodem-image",
+        help="Signed image to send after the app_ota UART banner is observed",
+    )
     parser.add_argument(
         "--slot0-address",
         help="Slot0 load address (provided by Meson)",
@@ -461,6 +523,11 @@ def main(argv: Optional[list[str]] = None) -> int:
                 if args.slot1_image
                 else None
             )
+            ymodem_image = (
+                require_file(Path(args.ymodem_image), "YMODEM image")
+                if args.ymodem_image
+                else None
+            )
         except FileNotFoundError as exc:
             logger.error("%s", exc)
             return 1
@@ -505,6 +572,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             build_dir,
             args.duration,
             args.display,
+            ymodem_image=ymodem_image,
         )
 
     finally:

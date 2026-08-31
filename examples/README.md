@@ -8,14 +8,17 @@
 examples/
 ├── boot/
 ├── app/
+├── app_ota/
 └── usecases/
     ├── slot0/
     ├── higher_version/
     ├── keygen_mix/
     └── boot_only/
+    └── ota/
 ```
 
 - `boot/`, `app/`: Reference implementations of boot and application software
+- `app_ota/`: Renode-only YMODEM OTA receiver that writes a signed image to slot1
 - `usecases/`: Use case definitions (independent `meson.build`)
 
 Runtime environment (startup, linker, HAL, Renode) is separated into `machines/`.
@@ -62,3 +65,7 @@ meson compile -C builddir
 
 Generates `boot.elf`, `app.vX.kY.img` for all use cases.
 `vX` is the version number, `kY` is the key generation number.
+
+Run the OTA demonstration with `meson compile -C builddir run_ota`. It loads
+`app_ota` in slot0, sends the signed version 2 application image over the
+Renode UART socket, and verifies boot-driven promotion from slot1 to slot0.

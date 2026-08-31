@@ -39,3 +39,15 @@ all_usecases += [{
   'has_slot0': usecase_has_slot0,
   'has_slot1': usecase_has_slot1,
 }]
+
+if machine_name == 'renode-cm4'
+  subdir('ota')
+  all_usecases += [{
+    'name': usecase_name,
+    'slot0': usecase_slot0,
+    'slot1': usecase_slot1,
+    'depends': usecase_depends,
+    'has_slot0': usecase_has_slot0,
+    'has_slot1': usecase_has_slot1,
+  }]
+endif
