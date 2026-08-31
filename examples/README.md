@@ -66,6 +66,17 @@ meson compile -C builddir
 Generates `boot.elf`, `app.vX.kY.img` for all use cases.
 `vX` is the version number, `kY` is the key generation number.
 
-Run the OTA demonstration with `meson compile -C builddir run_ota`. It loads
-`app_ota` in slot0, sends the signed version 2 application image over the
-Renode UART socket, and verifies boot-driven promotion from slot1 to slot0.
+For Renode, run the OTA demonstration with `meson compile -C builddir run_ota`.
+It loads `app_ota` in slot0, sends the signed version 2 application image over
+the Renode UART socket, and verifies boot-driven promotion from slot1 to slot0.
+
+For RX261, deploy `app_ota` in slot0, then send a signed application image with
+the YMODEM sender from the adjacent `ymodem_test` repository:
+
+```powershell
+uv run python ..\ymodem_test\python\ymodem_sender.py <serial-port> `
+  builddir\examples\app\app.v2.k0.img
+```
+
+The RX261 receiver programs code flash in 8-byte units. It pads only the final
+unit with erased (`0xFF`) bytes, preserving the signed image contents.
