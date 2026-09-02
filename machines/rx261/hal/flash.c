@@ -35,3 +35,8 @@ int hal_flash_erase_sector(uintptr_t addr)
 {
     return flash_type1_erase_sector(addr);
 }
+
+bool hal_flash_is_blank(uintptr_t addr)
+{
+    return flash_type1_is_blank(addr);
+}

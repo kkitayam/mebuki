@@ -6,10 +6,12 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 void hal_flash_init(void);
 int hal_flash_read(uintptr_t addr, void* buf, size_t len);
 int hal_flash_write(uintptr_t addr, const void* data, size_t len);
 int hal_flash_erase_sector(uintptr_t addr);
+bool hal_flash_is_blank(uintptr_t addr);
 
 #endif /* FLASH_H */

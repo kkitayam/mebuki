@@ -166,3 +166,25 @@ int hal_flash_erase_sector(uint32_t addr)
 
     return 0;
 }
+
+bool hal_flash_is_blank(uintptr_t addr)
+{
+    struct flash_region region;
+
+    if (!IS_FLASH_ADDR(addr) || !flash_region_for_address((uint32_t)addr, &region)) {
+        return false;
+    }
+
+    if (((addr - region.base) % region.erase_size) != 0U ||
+        ((addr + region.erase_size) > ((uintptr_t)region.base + region.size))) {
+        return false;
+    }
+
+    for (size_t i = 0U; i < region.erase_size; ++i) {
+        if (((const uint8_t*)addr)[i] != 0xFFU) {
+            return false;
+        }
+    }
+
+    return true;
+}

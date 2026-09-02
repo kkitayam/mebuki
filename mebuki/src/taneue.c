@@ -19,6 +19,7 @@
 /* Device-specific Flash HAL. */
 extern int hal_flash_write(uintptr_t address, const void* data, size_t size);
 extern int hal_flash_erase_sector(uintptr_t address);
+extern bool hal_flash_is_blank(uintptr_t address);
 
 /*
  * SLOT_A receives alignment and finalize phase erases.
@@ -87,20 +88,6 @@ static_assert((TANEUE_PROGRESS_BASE + TANEUE_PROGRESS_SIZE) <= MBK_SLOT0_BASE ||
 static_assert((TANEUE_PROGRESS_BASE + TANEUE_PROGRESS_SIZE) <= MBK_SLOT1_BASE ||
               TANEUE_PROGRESS_BASE >= (MBK_SLOT1_BASE + MBK_SLOT_SIZE),
               "TANEUE_PROGRESS region must not overlap Slot1");
-
-STATIC bool taneue_sector_is_erased(uintptr_t address)
-{
-    const uint32_t* p = (const uint32_t*)address;
-    const uint32_t* const end = p + (MBK_BLOCK_SIZE_SLOT / sizeof(*p));
-
-    while (p < end) {
-        if (*p++ != 0xFFFFFFFFU) {
-            return false;
-        }
-    }
-
-    return true;
-}
 
 STATIC int taneue_erase_progress_area(void)
 {
@@ -200,7 +187,7 @@ STATIC int taneue_mark_step_done(uint32_t step_index)
 
 STATIC int taneue_ensure_erased(uintptr_t address)
 {
-    if (taneue_sector_is_erased(address)) {
+    if (hal_flash_is_blank(address)) {
         return TANEUE_SUCCESS;
     }
 
@@ -238,8 +225,8 @@ STATIC uint32_t taneue_detect_endpoint(void)
     for (uint32_t i = TANEUE_SECTOR_COUNT; i > 0U; --i) {
         slot0_address -= MBK_BLOCK_SIZE_SLOT;
         slot1_address -= MBK_BLOCK_SIZE_SLOT;
-        if (!taneue_sector_is_erased(slot0_address) ||
-            !taneue_sector_is_erased(slot1_address)) {
+        if (!hal_flash_is_blank(slot0_address) ||
+            !hal_flash_is_blank(slot1_address)) {
             return i - 1U;
         }
     }
@@ -254,8 +241,8 @@ STATIC int taneue_find_schedule_endpoint(uint32_t* endpoint_out)
     const uintptr_t slot0_reserved = MBK_SLOT0_BASE + reserved_index * MBK_BLOCK_SIZE_SLOT;
     const uintptr_t slot1_reserved = MBK_SLOT1_BASE + reserved_index * MBK_BLOCK_SIZE_SLOT;
 
-    if (!taneue_sector_is_erased(slot0_reserved) ||
-        !taneue_sector_is_erased(slot1_reserved)) {
+    if (!hal_flash_is_blank(slot0_reserved) ||
+        !hal_flash_is_blank(slot1_reserved)) {
         return TANEUE_ERROR_PRECONDITION;
     }
 

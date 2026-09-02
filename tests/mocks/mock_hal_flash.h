@@ -20,6 +20,7 @@ extern "C" {
 int hal_flash_init(void);
 int hal_flash_write(uintptr_t address, const void* data, size_t size);
 int hal_flash_erase_sector(uintptr_t address);
+bool hal_flash_is_blank(uintptr_t address);
 int hal_flash_erase_all(void);
 
 /* Mock control functions for testing */

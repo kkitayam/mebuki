@@ -250,6 +250,25 @@ int hal_flash_erase_sector(uintptr_t address)
     return 0;
 }
 
+bool hal_flash_is_blank(uintptr_t address)
+{
+    struct erase_region region;
+
+    if (!resolve_erase_region(address, &region) ||
+        ((address - region.base) % region.erase_size) != 0U ||
+        !range_in_range(address, region.erase_size, region.base, region.size)) {
+        return false;
+    }
+
+    for (size_t i = 0U; i < region.erase_size; ++i) {
+        if (((const uint8_t*)address)[i] != 0xFFU) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 int hal_flash_erase_all(void)
 {
     if (error_injection_enabled) {
