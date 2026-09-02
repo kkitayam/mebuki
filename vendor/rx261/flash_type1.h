@@ -10,6 +10,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -30,6 +31,9 @@ int flash_type1_write(uintptr_t address, const void *data, size_t size);
 // DF block = 256 bytes, CF block = 2 KB.
 // Returns 0 on success, negative on error.
 int flash_type1_erase_sector(uintptr_t address);
+
+// Check if the block that contains address is blank (erased).
+bool flash_type1_is_blank(uintptr_t address);
 
 #ifdef __cplusplus
 }

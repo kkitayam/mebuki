@@ -519,3 +519,16 @@ int flash_type1_erase_sector(uintptr_t address)
 
     return FLASH_TYPE1_ERR_PARAM;
 }
+
+bool flash_type1_is_blank(uintptr_t address)
+{
+    if (is_data_flash(address)) {
+        return FLASH_TYPE1_OK == df_blank_check_block(address);
+    }
+
+    if (is_code_flash(address)) {
+        return FLASH_TYPE1_OK == cf_blank_check_block(address);
+    }
+
+    return false;
+}
