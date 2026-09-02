@@ -79,6 +79,19 @@ static inline void rx_smovb(void *dst, const void *src, size_t len)
     );
 }
 
+static void gptw_start_freerun(void)
+{
+    SYSTEM.PRCR.WORD = 0xA502;
+    MSTP(GPTW) = 0;
+    SYSTEM.PRCR.WORD = 0xA500;
+    GPTW7.GTCR.LONG = 1;
+}
+
+static uint32_t gptw_get_count(void)
+{
+    return GPTW7.GTCNT;
+}
+
 void _init(void) {
     /* A dummy function for C runtime initialization */
 }
@@ -110,6 +123,8 @@ void system_init(void)
     SYSTEM.SCKCR.LONG       = sckcr.LONG;
     SYSTEM.SCKCR3.BIT.CKSEL = SELECT_HOCO;
     SYSTEM.PRCR.WORD        = 0xA500;
+
+    gptw_start_freerun();
 }
 
 void system_reset(void)
@@ -142,19 +157,6 @@ END:
     goto END;
 }
 
-void gptw_start_freerun(void)
-{
-    SYSTEM.PRCR.WORD = 0xA502;
-    MSTP(GPTW) = 0;
-    SYSTEM.PRCR.WORD = 0xA500;
-    GPTW7.GTCR.LONG = 1;
-}
-
-uint32_t gptw_get_count(void)
-{
-    return GPTW7.GTCNT;
-}
-
 int memcmp(const void* s1, const void* s2, size_t n)
 {
     const uint8_t* p1 = (const uint8_t*)s1;
@@ -175,4 +177,9 @@ void *memmove(void *dest, const void *src, size_t n)
         rx_smovb(d, s, n);
     }
     return dest;
+}
+
+uint32_t get_cycle_count(void)
+{
+    return gptw_get_count();
 }

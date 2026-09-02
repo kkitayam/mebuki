@@ -9,6 +9,14 @@
  * - prepare_handoff: preparation before handing off control to the user application
  */
 
+#define DEMCR       (*(volatile uint32_t *)0xE000EDFCUL)
+#define DWT_CTRL    (*(volatile uint32_t *)0xE0001000UL)
+#define DWT_CYCCNT  (*(volatile uint32_t *)0xE0001004UL)
+
+#define DEMCR_TRCENA        (1UL << 24)
+#define DWT_CTRL_CYCCNTENA  (1UL << 0)
+#define DWT_CTRL_NOCYCCNT   (1UL << 25)
+
 /**
  * @brief PRIMASK register (interrupt mask register)
  *
@@ -33,6 +41,15 @@ static inline void enable_fpu(void)
     *cpacr |= (0xFU << 20);
     __asm__ volatile("dsb");
     __asm__ volatile("isb");
+}
+
+static inline void initialize_cycle_counter(void)
+{
+    if ((DWT_CTRL & DWT_CTRL_NOCYCCNT) != 0U) return;
+
+    DEMCR |= DEMCR_TRCENA;
+    DWT_CYCCNT = 0U;
+    DWT_CTRL |= DWT_CTRL_CYCCNTENA;
 }
 
 void _init(void) {
@@ -95,4 +112,9 @@ void halt(void)
     while (1) {
         __asm__ volatile("wfi");
     }
+}
+
+uint32_t get_cycle_count(void)
+{
+    return DWT_CYCCNT;
 }

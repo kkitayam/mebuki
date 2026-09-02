@@ -11,5 +11,6 @@ void system_reset(void) __attribute__((noreturn));
 void prepare_handoff(void);
 void jump_to_firmware(uint32_t entry_point) __attribute__((noreturn));
 void halt(void) __attribute__((noreturn));
+uint32_t get_cycle_count(void);
 
 #endif /* SYSTEM_H */

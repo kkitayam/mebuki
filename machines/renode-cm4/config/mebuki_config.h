@@ -81,12 +81,12 @@
  * ========================================================================== */
 
 /* Enable logging */
-#define MBK_ENABLE_LOG
+//#define MBK_ENABLE_LOG
 
 #ifdef MBK_ENABLE_LOG
 /* Log macro definition (external uart_puts() delegation) */
-extern void uart_printf(const char* fmt, ...);
-#  define MBK_LOG(...)  uart_printf(__VA_ARGS__)
+extern void uart_puts(const char*);
+#  define MBK_LOG(msg)  uart_puts(msg)
 #else
 #  define MBK_LOG(msg)  ((void)0)
 #endif

@@ -65,6 +65,13 @@ static void put_error_code(const char* message, int code)
     uart_puts("\r\n");
 }
 
+static void put_count(const char* message, uint32_t cnt)
+{
+    uart_puts(message);
+    put_dec(cnt);
+    uart_puts("\r\n");
+}
+
 #if 0
 /* for debug */
 static void dump(const void* beg, const void* end)
@@ -91,6 +98,8 @@ static void dump(const void* beg, const void* end)
 
 int main(void)
 {
+    uint32_t cnt;
+
     system_init();
     uart_init();
     hal_flash_init();
@@ -101,11 +110,13 @@ int main(void)
     uart_puts("==================================================\r\n");
 
     uart_puts("swap slots if needed...\r\n");
+    cnt = get_cycle_count();
     enum taneue_result err = taneue_swap_if_scheduled();
     if (err != TANEUE_SUCCESS) {
         put_error_code("ERROR: Failed to perform scheduled slot swap (code: ", (int)err);
         halt();
     }
+    put_count("TANEUE: ", get_cycle_count() - cnt);
 
     uart_puts("Initializing mebuki...\r\n");
 
@@ -120,12 +131,13 @@ int main(void)
     uart_puts("Finding bootable slot...\r\n");
 
     struct mbk_boot_info boot_info;
+    cnt = get_cycle_count();
     result = mbk_find_bootable_slot(&ctx, &boot_info);
-
     if (result != MBK_SUCCESS) {
         put_error_code("ERROR: No bootable slot found (code: ", (int)result);
         halt();
     }
+    put_count("MEBUKI: ", get_cycle_count() - cnt);
 
     /* print boot information */
 
