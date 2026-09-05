@@ -48,6 +48,20 @@
 #define FLASH_TYPE1_ERR_FAILURE   (-4)
 #define FLASH_TYPE1_ERR_ALIGN     (-5)
 
+/*
+ * Blank check method:
+ *   0 (default) — CPU SWHILE.B (read mode)
+ *   1           — Flash controller blank-check command (P/E mode)
+ *
+ * At 64 MHz ICLK, SWHILE.B is faster for both CF and DF
+ * (CF ~1 cycle/byte, DF ~3.5 cycles/byte vs HW ~8000 cycles per
+ * controller unit; CF about 3.7x faster). HW may win only when
+ * the CPU clock is much lower (e.g. 16 MHz).
+ */
+#ifndef FLASH_TYPE1_USE_HW_BLANK_CHECK
+#define FLASH_TYPE1_USE_HW_BLANK_CHECK  (0)
+#endif
+
 #define WAIT_MAX            (0x100000u)
 /* FSTATR0 bits: ERERR|PRGERR|BCERR|ILGLERR */
 #define FSTATR0_ERR_MASK    (0x13u)
@@ -101,10 +115,34 @@ static int is_code_flash(uintptr_t addr)
     return (addr >= CF_START) && (addr <= CF_END);
 }
 
+#if (0 == FLASH_TYPE1_USE_HW_BLANK_CHECK)
+/* Return 0 if all bytes are 0xFF, 1 if not. Uses RX SWHILE.B. */
+/*
+ * SWHILE.B (RX software manual):
+ *   R1 = start address (updated)
+ *   R2 = compare value (0xFF)
+ *   R3 = count (updated; 0 means ignored / all matched)
+ */
+static int mem_is_blank(const void *addr, size_t nbytes)
+{
+    register uint32_t ptr __asm__("r1") = (uint32_t)(uintptr_t)addr;
+    register uint32_t cmp __asm__("r2") = 0xFFu;
+    register uint32_t cnt __asm__("r3") = (uint32_t)nbytes;
+
+    __asm volatile (
+        "swhile.b"
+        : "+r"(ptr), "+r"(cnt)
+        : "r"(cmp), "m"(*(const uint8_t (*)[nbytes])addr)
+        : "cc"
+    );
+
+    return (cnt == 0u) ? 0 : 1;
+}
+#endif
+
 /* -------------------------------------------------------------------------- */
 /* Data Flash path (XIP from Code Flash)                                        */
 /* -------------------------------------------------------------------------- */
-
 static void df_write_fpmcr(uint8_t value)
 {
     FLASH.FPR = 0xA5u;
@@ -196,12 +234,11 @@ static int df_write_byte(uintptr_t dest, uint8_t data)
     return df_check_error_and_clear();
 }
 
-
-static int df_blank_check_block(uintptr_t start)
+static int df_blank_check_range(uintptr_t start, size_t nbytes)
 {
-    const uint32_t offset   = (uint32_t)(start & ~(DF_BLOCK_SIZE - 1u)) - DF_BASE;
-    const uint32_t pe_start = 0xFE000000u + offset;
-    const uint32_t pe_end   = pe_start + DF_BLOCK_SIZE - 1u;
+#if FLASH_TYPE1_USE_HW_BLANK_CHECK
+    const uint32_t pe_start = 0xFE000000u + ((uint32_t)start - DF_BASE);
+    const uint32_t pe_end   = pe_start + (uint32_t)nbytes - 1u;
 
     FLASH.FASR.BIT.EXS = 0;
     FLASH.FSARH = (uint16_t)(pe_start >> 16);
@@ -215,29 +252,32 @@ static int df_blank_check_block(uintptr_t start)
         return FLASH_TYPE1_ERR_TIMEOUT;
     }
 
-    /* BCERR set means the area is not blank. */
     if ((FLASH.FSTATR0.BYTE & FSTATR0_BCERR_MASK) != 0) {
         FLASH.FCR.BYTE = FCR_CLEAR;
-        while (FLASH.FSTATR1.BIT.FRDY != 0) {
+        for (uint32_t cnt = 0; cnt < WAIT_MAX; ++cnt) {
+            if (FLASH.FSTATR1.BIT.FRDY == 0) {
+                break;
+            }
         }
         return 1;
     }
 
     return df_check_error_and_clear();
+#else
+    return mem_is_blank((const void *)start, nbytes);
+#endif
 }
 
-static int df_erase_block(uintptr_t start)
+static int df_erase_range(uintptr_t start, size_t nbytes)
 {
-    const uint32_t offset   = (uint32_t)(start & ~(DF_BLOCK_SIZE - 1u)) - DF_BASE;
-    const uint32_t pe_start = 0xFE000000u + offset;
-    const uint32_t pe_end   = pe_start + DF_BLOCK_SIZE - 1u;
+    const uint32_t pe_start = 0xFE000000u + ((uint32_t)start - DF_BASE);
+    const uint32_t pe_end   = pe_start + (uint32_t)nbytes - 1u;
 
     FLASH.FASR.BIT.EXS = 0;
-
     FLASH.FSARH = (uint16_t)(pe_start >> 16);
     FLASH.FSARL = (uint16_t)(pe_start & 0xFFFFu);
-    FLASH.FEARH = (uint16_t)(pe_end   >> 16);
-    FLASH.FEARL = (uint16_t)(pe_end   & 0xFFFFu);
+    FLASH.FEARH = (uint16_t)(pe_end >> 16);
+    FLASH.FEARL = (uint16_t)(pe_end & 0xFFFFu);
 
     FLASH.FCR.BYTE = FCR_ERASE;
 
@@ -260,24 +300,37 @@ static int df_write(uintptr_t address, const uint8_t *src, size_t size)
     return ret;
 }
 
-static int df_erase(uintptr_t address)
+static int df_erase(uintptr_t block_start, size_t erase_bytes)
 {
-    int ret = enter_df_pe_mode();
+    int ret;
+
+#if !FLASH_TYPE1_USE_HW_BLANK_CHECK
+    ret = df_blank_check_range(block_start, erase_bytes);
+    if (ret != 1) {
+        return (ret < 0) ? ret : (int)erase_bytes;
+    }
+#endif
+    ret = enter_df_pe_mode();
     if (ret == FLASH_TYPE1_OK) {
-        ret = df_blank_check_block(address);
-        /* Erase only if the block is not blank. */
+#if FLASH_TYPE1_USE_HW_BLANK_CHECK
+        ret = df_blank_check_range(block_start, erase_bytes);
         if (ret == 1) {
-            ret = df_erase_block(address);
+            ret = df_erase_range(block_start, erase_bytes);
         }
+#else
+        ret = df_erase_range(block_start, erase_bytes);
+#endif
     }
     enter_df_read_mode();
-    return ret;
+    if (ret < 0) {
+        return ret;
+    }
+    return (int)erase_bytes;
 }
 
 /* -------------------------------------------------------------------------- */
 /* Code Flash path (must run from RAM; ROM fetch disabled in CF P/E mode)     */
 /* -------------------------------------------------------------------------- */
-
 FLASH_TYPE1_PE_RAM
 static void cf_delay_us(uint32_t us)
 {
@@ -334,9 +387,6 @@ static int enter_cf_pe_mode(void)
     return FLASH_TYPE1_OK;
 }
 
-
-
-
 FLASH_TYPE1_PE_RAM
 static void enter_cf_read_mode(void)
 {
@@ -348,10 +398,6 @@ static void enter_cf_read_mode(void)
     while (FLASH.FENTRYR.WORD != 0x0000u) {
     }
 }
-
-
-
-
 
 FLASH_TYPE1_PE_RAM
 static int cf_write_8byte(uintptr_t dest, const uint8_t *src)
@@ -378,16 +424,16 @@ static int cf_write_8byte(uintptr_t dest, const uint8_t *src)
     return cf_check_error_and_clear();
 }
 
-
+#if FLASH_TYPE1_USE_HW_BLANK_CHECK
 FLASH_TYPE1_PE_RAM
-static int cf_blank_check_block(uintptr_t start)
+#endif
+static int cf_blank_check_range(uintptr_t start, size_t nbytes)
 {
-    const uint32_t pe_start =
-        (uint32_t)(start & ~(CF_BLOCK_SIZE - 1u)) - CODEFLASH_ADDR_OFFSET;
-    const uint32_t pe_end = pe_start + CF_BLOCK_SIZE - 1u;
+#if FLASH_TYPE1_USE_HW_BLANK_CHECK
+    const uint32_t pe_start = (uint32_t)start - CODEFLASH_ADDR_OFFSET;
+    const uint32_t pe_end   = pe_start + (uint32_t)nbytes - 1u;
 
     FLASH.FASR.BIT.EXS = 0;
-    /* Align the address to 8 bytes (FIT does the same). */
     FLASH.FSARH = (uint16_t)(pe_start >> 16);
     FLASH.FSARL = (uint16_t)(pe_start & 0xFFF8u);
     FLASH.FEARH = (uint16_t)(pe_end >> 16);
@@ -399,31 +445,34 @@ static int cf_blank_check_block(uintptr_t start)
         return FLASH_TYPE1_ERR_TIMEOUT;
     }
 
-    /* BCERR set means the area is not blank. */
     if ((FLASH.FSTATR0.BYTE & FSTATR0_BCERR_MASK) != 0) {
         FLASH.FCR.BYTE = FCR_CLEAR;
-        while (FLASH.FSTATR1.BIT.FRDY != 0) {
+        for (uint32_t cnt = 0; cnt < WAIT_MAX; ++cnt) {
+            if (FLASH.FSTATR1.BIT.FRDY == 0) {
+                break;
+            }
         }
         return 1;
     }
 
     return cf_check_error_and_clear();
+#else
+    /* Read mode only; Code Flash is not readable in CF P/E mode. */
+    return mem_is_blank((const void *)start, nbytes);
+#endif
 }
 
 FLASH_TYPE1_PE_RAM
-static int cf_erase_block(uintptr_t start)
+static int cf_erase_range(uintptr_t start, size_t nbytes)
 {
-    /* FIT R_CF_Erase: convert read-form addresses to P/E-form */
-    const uint32_t pe_start =
-        (uint32_t)(start & ~(CF_BLOCK_SIZE - 1u)) - CODEFLASH_ADDR_OFFSET;
-    const uint32_t pe_end = pe_start + CF_BLOCK_SIZE - 1u;
+    const uint32_t pe_start = (uint32_t)start - CODEFLASH_ADDR_OFFSET;
+    const uint32_t pe_end   = pe_start + (uint32_t)nbytes - 1u;
 
     FLASH.FASR.BIT.EXS = 0;
-
     FLASH.FSARH = (uint16_t)(pe_start >> 16);
     FLASH.FSARL = (uint16_t)(pe_start & 0xFFFFu);
-    FLASH.FEARH = (uint16_t)(pe_end   >> 16);
-    FLASH.FEARL = (uint16_t)(pe_end   & 0xFFFFu);
+    FLASH.FEARH = (uint16_t)(pe_end >> 16);
+    FLASH.FEARL = (uint16_t)(pe_end & 0xFFFFu);
 
     FLASH.FCR.BYTE = FCR_ERASE;
 
@@ -452,23 +501,50 @@ static int cf_write(uintptr_t address, const uint8_t *src, size_t size)
 }
 
 FLASH_TYPE1_PE_RAM_API
-static int cf_erase(uintptr_t address)
+static int cf_erase(uintptr_t block_start, size_t erase_bytes)
 {
-    int ret = enter_cf_pe_mode();
+    int ret;
+
+#if !FLASH_TYPE1_USE_HW_BLANK_CHECK
+    /* Soft blank check must run before CF P/E (ROM fetch disabled in PE). */
+    ret = cf_blank_check_range(block_start, erase_bytes);
+    if (ret != 1) {
+        return (ret < 0) ? ret : (int)erase_bytes;
+    }
+#endif
+    ret = enter_cf_pe_mode();
     if (ret == FLASH_TYPE1_OK) {
-        ret = cf_blank_check_block(address);
-        /* Erase only if the block is not blank. */
+#if FLASH_TYPE1_USE_HW_BLANK_CHECK
+        ret = cf_blank_check_range(block_start, erase_bytes);
         if (ret == 1) {
-            ret = cf_erase_block(address);
+            ret = cf_erase_range(block_start, erase_bytes);
         }
+#else
+        ret = cf_erase_range(block_start, erase_bytes);
+#endif
     }
     enter_cf_read_mode();
-    return ret;
+    if (ret < 0) {
+        return ret;
+    }
+    return (int)erase_bytes;
 }
 
 /* -------------------------------------------------------------------------- */
 /* Public API (flash-resident; CF work is delegated to RAM functions)         */
 /* -------------------------------------------------------------------------- */
+#if FLASH_TYPE1_USE_HW_BLANK_CHECK
+FLASH_TYPE1_PE_RAM_API
+static int cf_is_blank_range(uintptr_t address, size_t size)
+{
+    int ret = enter_cf_pe_mode();
+    if (ret == FLASH_TYPE1_OK) {
+        ret = cf_blank_check_range(address, size);
+    }
+    enter_cf_read_mode();
+    return ret;
+}
+#endif
 
 void flash_type1_init(void)
 {
@@ -507,27 +583,70 @@ int flash_type1_write(uintptr_t address, const void *data, size_t size)
     return FLASH_TYPE1_ERR_PARAM;
 }
 
-int flash_type1_erase_sector(uintptr_t address)
+int flash_type1_erase(uintptr_t address, size_t size)
 {
     if (is_data_flash(address)) {
-        return df_erase(address);
+        const uintptr_t block_start = address & ~(uintptr_t)(DF_BLOCK_SIZE - 1u);
+        const size_t erase_bytes = (size / DF_BLOCK_SIZE) * DF_BLOCK_SIZE;
+
+        if (erase_bytes == 0) {
+            return 0;
+        }
+        if ((block_start < DF_BASE) ||
+            (block_start + erase_bytes) > (DF_BASE + DF_SIZE)) {
+            return FLASH_TYPE1_ERR_PARAM;
+        }
+        return df_erase(block_start, erase_bytes);
     }
 
     if (is_code_flash(address)) {
-        return cf_erase(address);
+        const uintptr_t block_start = address & ~(uintptr_t)(CF_BLOCK_SIZE - 1u);
+        const size_t erase_bytes = (size / CF_BLOCK_SIZE) * CF_BLOCK_SIZE;
+
+        if (erase_bytes == 0) {
+            return 0;
+        }
+        if (block_start < CF_START ||
+            (block_start + erase_bytes - 1u) > CF_END) {
+            return FLASH_TYPE1_ERR_PARAM;
+        }
+        return cf_erase(block_start, erase_bytes);
     }
 
     return FLASH_TYPE1_ERR_PARAM;
 }
 
-bool flash_type1_is_blank(uintptr_t address)
+bool flash_type1_is_blank(uintptr_t address, size_t size)
 {
+    if (size == 0) {
+        return true;
+    }
+
     if (is_data_flash(address)) {
-        return FLASH_TYPE1_OK == df_blank_check_block(address);
+        if ((address + size) > (DF_BASE + DF_SIZE)) {
+            return false;
+        }
+#if FLASH_TYPE1_USE_HW_BLANK_CHECK
+        int ret = enter_df_pe_mode();
+        if (ret == FLASH_TYPE1_OK) {
+            ret = df_blank_check_range(address, size);
+        }
+        enter_df_read_mode();
+        return (ret == 0);
+#else
+        return (df_blank_check_range(address, size) == 0);
+#endif
     }
 
     if (is_code_flash(address)) {
-        return FLASH_TYPE1_OK == cf_blank_check_block(address);
+        if ((address + size - 1u) > CF_END) {
+            return false;
+        }
+#if FLASH_TYPE1_USE_HW_BLANK_CHECK
+        return (cf_is_blank_range(address, size) == 0);
+#else
+        return (cf_blank_check_range(address, size) == 0);
+#endif
     }
 
     return false;
