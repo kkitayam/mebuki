@@ -121,36 +121,29 @@ STATIC struct taneue_progress_scan taneue_scan_progress(void)
     const uint16_t* const hdr = (const uint16_t*)TANEUE_PROGRESS_BASE;
     const uint16_t ep = hdr[0];
     const uint16_t ep_inv = hdr[1];
-    const uint8_t* p = (const uint8_t*)(TANEUE_PROGRESS_BASE + TANEUE_PROGRESS_STEPS_OFFSET);
+    const uint8_t* start = (const uint8_t*)(TANEUE_PROGRESS_BASE + TANEUE_PROGRESS_STEPS_OFFSET);
     const uint8_t* const end = (const uint8_t*)(TANEUE_PROGRESS_BASE + TANEUE_PROGRESS_SIZE);
     const bool header_is_clean = (ep == UINT16_MAX) && (ep_inv == UINT16_MAX);
     const bool header_is_valid = (ep != UINT16_MAX) &&
                                  ((uint32_t)ep < (TANEUE_SECTOR_COUNT - 1U)) &&
                                  (ep_inv == (uint16_t)~ep);
-    bool seen_ff = false;
 
     if (!header_is_clean && !header_is_valid) {
         scan.state = TANEUE_PROGRESS_CORRUPT;
         return scan;
     }
 
-    while (p < end) {
-        const uint8_t value = *p++;
+    const uint8_t* p = start;
+    while (p < end && *p == 0x00U) {
+        p++;
+    }
+    scan.completed_steps = (uint32_t)(p - start);
 
-        if (value == 0x00U) {
-            if (seen_ff) {
-                scan.state = TANEUE_PROGRESS_CORRUPT;
-                return scan;
-            }
-            scan.completed_steps++;
-            continue;
-        }
+    while (p < end && *p == 0xFFU) {
+        p++;
+    }
 
-        if (value == 0xFFU) {
-            seen_ff = true;
-            continue;
-        }
-
+    if (p != end) {
         scan.state = TANEUE_PROGRESS_CORRUPT;
         return scan;
     }
@@ -185,21 +178,15 @@ STATIC int taneue_mark_step_done(uint32_t step_index)
     return TANEUE_SUCCESS;
 }
 
-STATIC int taneue_ensure_erased(uintptr_t address)
+STATIC int taneue_copy_sector(uintptr_t dst, uintptr_t src)
 {
-    if (hal_flash_is_blank(address)) {
+    if (memcmp((const void*)dst, (const void*)src, MBK_BLOCK_SIZE_SLOT) == 0) {
         return TANEUE_SUCCESS;
     }
-
-    if (hal_flash_erase_sector(address) != 0) {
+    if (hal_flash_erase_sector(dst)) {
         return TANEUE_ERROR_FLASH;
     }
 
-    return TANEUE_SUCCESS;
-}
-
-STATIC int taneue_copy_sector(uintptr_t dst, uintptr_t src)
-{
     const uint8_t* src_bytes = (const uint8_t*)src;
     const uint8_t* const end = src_bytes + MBK_BLOCK_SIZE_SLOT;
     uint8_t page[MBK_FLASH_PAGE_SIZE];
@@ -257,11 +244,6 @@ STATIC int taneue_find_schedule_endpoint(uint32_t* endpoint_out)
 STATIC int taneue_swap_phase_step1(uint32_t i)
 {
     const uintptr_t dst = TANEUE_WEAR_SLOT_A_BASE + (i + 1U) * MBK_BLOCK_SIZE_SLOT;
-    int err;
-
-    err = taneue_ensure_erased(dst);
-    if (err) { return err; }
-
     return taneue_copy_sector(dst, TANEUE_WEAR_SLOT_B_BASE + i * MBK_BLOCK_SIZE_SLOT);
 }
 
@@ -269,15 +251,10 @@ STATIC int taneue_swap_phase_step2(uint32_t i)
 {
     const uintptr_t dst = TANEUE_WEAR_SLOT_B_BASE + i * MBK_BLOCK_SIZE_SLOT;
     const uintptr_t src = TANEUE_WEAR_SLOT_A_BASE + i * MBK_BLOCK_SIZE_SLOT;
-    int err;
 
     if (memcmp((const void*)dst, (const void*)src, MBK_BLOCK_SIZE_SLOT) == 0) {
         return TANEUE_SUCCESS;
     }
-
-    err = taneue_ensure_erased(dst);
-    if (err) { return err; }
-
     return taneue_copy_sector(dst, src);
 }
 
@@ -285,17 +262,14 @@ STATIC int taneue_align_phase_step(uint32_t i)
 {
     const uintptr_t dst = TANEUE_WEAR_SLOT_A_BASE + i * MBK_BLOCK_SIZE_SLOT;
     const uintptr_t src = TANEUE_WEAR_SLOT_A_BASE + (i + 1U) * MBK_BLOCK_SIZE_SLOT;
-    int err;
-
-    err = taneue_ensure_erased(dst);
-    if (err) { return err; }
-
     return taneue_copy_sector(dst, src);
 }
 
 STATIC int taneue_finalize_phase(uint32_t endpoint)
 {
-    return taneue_ensure_erased(TANEUE_WEAR_SLOT_A_BASE + (endpoint + 1U) * MBK_BLOCK_SIZE_SLOT);
+    int err = hal_flash_erase_sector(TANEUE_WEAR_SLOT_A_BASE + (endpoint + 1U) * MBK_BLOCK_SIZE_SLOT);
+    if (err) { return TANEUE_ERROR_FLASH; }
+    return TANEUE_SUCCESS;
 }
 
 STATIC int taneue_execute_from_step(uint32_t endpoint, uint32_t completed_steps)
