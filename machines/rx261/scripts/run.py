@@ -37,6 +37,10 @@ class SerialYmodemTransport:
                 data = bytes(self.buffer[:size])
                 del self.buffer[:size]
                 return data
+            if self.capture.pending_uart:
+                data = bytes(self.capture.pending_uart[:size])
+                del self.capture.pending_uart[:size]
+                return data
             data = self.capture.read_uart(self.log_file)
             if data:
                 self.capture.captured_uart.extend(data)
@@ -71,6 +75,7 @@ class SerialLogCapture:
         self.serial = None
         self.rfp_process = None
         self.display = display
+        self.pending_uart = bytearray()
 
         logging.basicConfig(
             level=logging.INFO,
@@ -187,10 +192,15 @@ class SerialLogCapture:
             self.captured_uart = bytearray()
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
+            previous_length = len(self.captured_uart)
             data = self.read_uart(log_file)
             if data:
                 self.captured_uart.extend(data)
-            if marker in self.captured_uart:
+            search_start = max(0, previous_length - len(marker) + 1)
+            marker_start = self.captured_uart.find(marker, search_start)
+            if marker_start >= 0:
+                marker_end = marker_start + len(marker)
+                self.pending_uart.extend(self.captured_uart[marker_end:])
                 return True
             time.sleep(0.01)
         return False
