@@ -274,36 +274,50 @@ STATIC int taneue_finalize_phase(uint32_t endpoint)
 
 STATIC int taneue_execute_from_step(uint32_t endpoint, uint32_t completed_steps)
 {
+    const uint32_t swap_steps = 2U * (endpoint + 1U);
     const uint32_t total_steps = (3U * (endpoint + 1U)) + 1U;
     int err;
-    uint32_t step = 0U;
+    uint32_t step = completed_steps;
 
-    for (uint32_t i = endpoint + 1U; i-- > 0U;) {
-        if (step >= completed_steps) {
+    if (completed_steps < swap_steps) {
+        uint32_t first_i = endpoint - (completed_steps / 2U);
+
+        if ((completed_steps & 1U) != 0U) {
+            err = taneue_swap_phase_step2(first_i);
+            if (err) { return err; }
+            err = taneue_mark_step_done(step);
+            if (err) { return err; }
+            step++;
+            first_i--;
+        }
+
+        for (uint32_t i = first_i + 1U; i-- > 0U;) {
             err = taneue_swap_phase_step1(i);
             if (err) { return err; }
             err = taneue_mark_step_done(step);
             if (err) { return err; }
-        }
-        step++;
+            step++;
 
-        if (step >= completed_steps) {
             err = taneue_swap_phase_step2(i);
             if (err) { return err; }
             err = taneue_mark_step_done(step);
             if (err) { return err; }
+            step++;
         }
-        step++;
+
+        step = swap_steps;
     }
 
-    for (uint32_t i = 0; i <= endpoint; ++i) {
-        if (step >= completed_steps) {
+    if (step < total_steps - 1U) {
+        uint32_t first_i = step > swap_steps ? step - swap_steps : 0U;
+
+        for (uint32_t i = first_i; i <= endpoint; ++i) {
             err = taneue_align_phase_step(i);
             if (err) { return err; }
             err = taneue_mark_step_done(step);
             if (err) { return err; }
+            step++;
         }
-        step++;
     }
 
     if (step >= completed_steps) {
@@ -358,19 +372,18 @@ int taneue_swap_if_scheduled(void)
         return TANEUE_SUCCESS;
     }
 
-    {
-        const uint32_t total_steps = (3U * (scan.endpoint + 1U)) + 1U;
+    const uint32_t total_steps = (3U * (scan.endpoint + 1U)) + 1U;
 
-        if (scan.completed_steps > total_steps) {
-            err = taneue_erase_progress_area();
-            if (err) { MBK_LOG("fail to erase progress area\n"); return err; }
-            return TANEUE_ERROR_INVALID_STATE;
-        }
-
-        if (scan.completed_steps < total_steps) {
-            err = taneue_execute_from_step(scan.endpoint, scan.completed_steps);
-            if (err) { MBK_LOG("fail to execute from step\n"); return err; }
-        }
+    if (scan.completed_steps > total_steps) {
+        err = taneue_erase_progress_area();
+        if (err) { MBK_LOG("fail to erase progress area\n"); return err; }
+        return TANEUE_ERROR_INVALID_STATE;
     }
+
+    if (scan.completed_steps < total_steps) {
+        err = taneue_execute_from_step(scan.endpoint, scan.completed_steps);
+        if (err) { MBK_LOG("fail to execute from step\n"); return err; }
+    }
+
     return taneue_erase_progress_area();
 }
