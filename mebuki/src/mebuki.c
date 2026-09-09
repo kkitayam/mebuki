@@ -179,6 +179,9 @@ static_assert(sizeof(struct mbk_context) >= sizeof(struct mbk_bfl_entry),
 /* Device-specific Flash HAL. */
 extern int hal_flash_write(uintptr_t address, const void* data, size_t size);
 extern int hal_flash_erase_sector(uintptr_t address);
+#if MBK_FLASH_BLANK_VALUE_UNDEFINED
+extern bool hal_flash_is_blank(uintptr_t address);
+#endif
 
 /* Signature verification layer (mebuki_svl.h or external implementation) */
 extern int mbk_svl_init(void);
@@ -356,13 +359,23 @@ STATIC void bfl_load_entry(struct mbk_bfl_entry* out)
     const struct mbk_bfl_sector* sec0 = (const struct mbk_bfl_sector*)MBK_DATA0_BASE;
     const struct mbk_bfl_sector* sec1 = (const struct mbk_bfl_sector*)MBK_DATA1_BASE;
     const struct mbk_bfl_sector* secs[MBK_BFL_NUM_BLOCKS] = {sec0, sec1};
-    const uint32_t rem0 = sec0->entry.remaining_stores;
-    const uint32_t rem1 = sec1->entry.remaining_stores;
-    /* Prefer the entry with the smaller remaining_stores value. */
-    bool prefer_sec1 = rem1 != MBK_BFL_INVALID && (rem0 == MBK_BFL_INVALID || rem1 < rem0);
+#if MBK_FLASH_BLANK_VALUE_UNDEFINED
+    uint32_t is_blank = 0;
+    for (unsigned i = 0; i < MBK_BFL_NUM_BLOCKS; ++i) {
+        if (hal_flash_is_blank((uintptr_t)secs[i])) {
+            is_blank |= 1U << i;
+        }
+    }
+#else
+    const uint32_t is_blank = 0;
+#endif
+    const uint32_t rem0 = is_blank & 1U ? MBK_BFL_INVALID : sec0->entry.remaining_stores;
+    const uint32_t rem1 = is_blank & 2U ? MBK_BFL_INVALID : sec1->entry.remaining_stores;
+    const bool prefer_sec1 = rem1 != MBK_BFL_INVALID && (rem0 == MBK_BFL_INVALID || rem1 < rem0);
 
     int n = prefer_sec1 ? 1 : 0;
-    for (unsigned int i = 0; i < MBK_BFL_NUM_BLOCKS; ++i, n ^= 1) {
+    for (unsigned i = 0; i < MBK_BFL_NUM_BLOCKS; ++i, n ^= 1) {
+        if (is_blank & (1U << n)) continue;
         *out = secs[n]->entry;
         if (out->integrity == bfl_compute_record_integrity(out)) {
             return;
@@ -383,12 +396,24 @@ STATIC int bfl_store_entry(struct mbk_bfl_entry* inout)
         return MBK_BFL_ERROR_NO_REMAINING_STORES;
     }
 
+#if MBK_FLASH_BLANK_VALUE_UNDEFINED
+    uint32_t is_blank = 0U;
+    const struct mbk_bfl_sector* secs[MBK_BFL_NUM_BLOCKS] = {sec0, sec1};
+    for (unsigned i = 0; i < MBK_BFL_NUM_BLOCKS; ++i) {
+        if (hal_flash_is_blank((uintptr_t)secs[i])) {
+            is_blank |= 1U << i;
+        }
+    }
+#else
+    const uint32_t is_blank = 0;
+#endif
+
     /* Write to the alternate configured sector (ping-pong update). */
     uintptr_t target_addr;
     const uint32_t c = inout->integrity;
-    if (c == sec0->entry.integrity) {
+    if (!(is_blank & (1U << 0)) && c == sec0->entry.integrity) {
         target_addr = MBK_DATA1_BASE;
-    } else if (c == sec1->entry.integrity) {
+    } else if (!(is_blank & (1U << 1)) && c == sec1->entry.integrity) {
         target_addr = MBK_DATA0_BASE;
     } else {
         MBK_LOG("BFL store failed: integrity mismatch\n");
@@ -504,7 +529,7 @@ int mbk_find_bootable_slot(struct mbk_context* ctx, struct mbk_boot_info* boot_i
     int n = prefer_slot1 ? 1 : 0;
     struct mbk_record_update upd;
     struct mbk_bfl_entry* e = (struct mbk_bfl_entry*)ctx;
-    for (unsigned int i = 0; i < MBK_NUM_SLOTS; ++i, n ^= 1) {
+    for (unsigned i = 0; i < MBK_NUM_SLOTS; ++i, n ^= 1) {
         const struct mbk_header* slot_adr = slot_adrs[n];
         switch (bsl_validate_slot(&e->record, slot_adr, &upd)) {
         default:
