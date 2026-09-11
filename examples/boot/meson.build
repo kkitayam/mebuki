@@ -92,6 +92,49 @@ if machine_name == 'rx261'
       '--rfp-cli', rfp_cli,
     ],
   )
+elif machine_name == 'rx65n'
+  rfp_cli = find_program('rfp-cli')
+  python_exe = find_program('python3', 'python', required: true)
+  serial_port_option = get_option('serial_port')
+
+  boot_srec = custom_target(
+    'boot_srec',
+    input: boot_exe,
+    output: boot_exe.name() + '.s32',
+    command: [objcopy, '-O', 'srec', '@INPUT@', '@OUTPUT@'],
+    build_by_default: true,
+  )
+
+  rfp_args = [
+    '-d', 'RX65x',
+    '-t', 'e2l',
+    '-if', 'fine',
+    '-auth', 'id', 'FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF',
+  ]
+
+  run_target(
+    'deploy',
+    command: [rfp_cli] + rfp_args + ['-a', boot_srec],
+  )
+
+  if serial_port_option == ''
+    error('serial_port option must be specified for RX65N run target. Use -Dserial_port=<port>')
+  endif
+
+  run_script = meson.project_source_root() / 'machines' / 'rx65n' / 'scripts' / 'run.py'
+  foreach run_name : ['run', 'run-capture']
+    run_args = [
+      python_exe,
+      run_script,
+      serial_port_option,
+      '--build-dir', meson.current_build_dir(),
+      '--rfp-cli', rfp_cli,
+    ]
+    if run_name == 'run'
+      run_args += ['--display']
+    endif
+    run_target(run_name, command: run_args)
+  endforeach
 endif
 
 run_target(

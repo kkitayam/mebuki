@@ -3,7 +3,7 @@ if not sign_algorithms.has_key(verification)
   error('Unsupported SVL: @0@'.format(verification))
 endif
 
-if machine_name != 'renode-cm4' and machine_name != 'rx261'
+if machine_name != 'renode-cm4' and machine_name != 'rx261' and machine_name != 'rx65n'
   error('Unsupported machine for examples: @0@'.format(machine_name))
 endif
 
@@ -43,12 +43,16 @@ endforeach
 sign_algo = sign_algorithms[verification]
 
 subdir('boot')
-subdir('app')
+if machine_name != 'rx65n'
+  subdir('app')
+endif
 if machine_name == 'renode-cm4' or machine_name == 'rx261'
   subdir('app_ota')
 endif
 
-subdir('usecases')
+if machine_name != 'rx65n'
+  subdir('usecases')
+endif
 
 if machine_name == 'renode-cm4'
   python_exe = find_program('python3', 'python', required: true)

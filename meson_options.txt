@@ -1,8 +1,8 @@
 option('target',
   type: 'combo',
-  choices: ['all', 'renode-cm4', 'cm4', 'rx261'],
+  choices: ['all', 'renode-cm4', 'cm4', 'rx261', 'rx65n'],
   value: 'all',
-  description: 'Target machine to build (all, renode-cm4, rx261)',
+  description: 'Target machine to build',
 )
 option('svl',
   type: 'combo',
@@ -19,5 +19,5 @@ option('accel',
 option('serial_port',
   type: 'string',
   value: '',
-  description: 'Serial port for RX261 run target (e.g., COM3)',
+  description: 'Serial port for hardware run targets (e.g., COM3)',
 )
