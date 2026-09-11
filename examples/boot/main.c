@@ -11,6 +11,10 @@
 #include "mebuki.h"
 #include "taneue.h"
 
+#ifdef MEBUKI_BOOT_USE_BANK_SWAP
+#include "flash_type4.h"
+#endif
+
 void uart_printf(const char* fmt, ...)
 {
     uart_puts(fmt);
@@ -109,6 +113,7 @@ int main(void)
     uart_puts("Boot Software (mebuki)\r\n");
     uart_puts("==================================================\r\n");
 
+#ifndef MEBUKI_BOOT_USE_BANK_SWAP
     uart_puts("swap slots if needed...\r\n");
     cnt = get_cycle_count();
     enum taneue_result err = taneue_swap_if_scheduled();
@@ -117,6 +122,7 @@ int main(void)
         halt();
     }
     put_count("TANEUE: ", get_cycle_count() - cnt);
+#endif
 
     uart_puts("Initializing mebuki...\r\n");
 
@@ -177,11 +183,19 @@ int main(void)
     if (boot_info.slot_id == 1) {
         /* The application software is built to run from slot0, so a swap is necessary when booting from slot1 */
         uart_puts("Scheduling slot swap...\r\n");
+#ifdef MEBUKI_BOOT_USE_BANK_SWAP
+        int swap_result = flash_type4_swap_bank();
+        if (swap_result != 0) {
+            put_error_code("ERROR: Failed to swap flash bank (code: ", swap_result);
+            halt();
+        }
+#else
         enum taneue_result result = taneue_schedule_swap();
         if (result != TANEUE_SUCCESS) {
             put_error_code("ERROR: Failed to schedule slot swap (code: ", (int)result);
             halt();
         }
+#endif
         uart_puts("Slot swap scheduled\r\n");
         system_reset();  /* swap operation is deferred until the next boot */
     }

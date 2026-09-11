@@ -24,6 +24,7 @@ boot_exe = executable(
     boot_library_dep,
     machine_hal_dep,
   ],
+  c_args: machine_name == 'rx65n' ? ['-DMEBUKI_BOOT_USE_BANK_SWAP=1'] : [],
   link_args: [
     '-T' + machine_boot_linker[0].full_path(),
     '-Wl,-Map=' + meson.current_build_dir() / 'boot.map',
@@ -105,6 +106,23 @@ elif machine_name == 'rx65n'
     build_by_default: true,
   )
 
+  boot_bank0_srec = custom_target(
+    'boot_bank0_srec',
+    input: boot_exe,
+    output: 'boot_bank0.s32',
+    command: [objcopy, '--change-addresses', '-0x100000', '-O', 'srec', '@INPUT@', '@OUTPUT@'],
+    build_by_default: true,
+  )
+
+  python_merge_srec = files('../../machines/rx65n/scripts/merge_srec.py')
+  boot_dualbank_srec = custom_target(
+    'boot_dualbank_srec',
+    input: [boot_srec, boot_bank0_srec],
+    output: 'boot_dualbank.s32',
+    command: [python_exe, python_merge_srec, '@INPUT@', '@OUTPUT@'],
+    build_by_default: true,
+  )
+
   rfp_args = [
     '-d', 'RX65x',
     '-t', 'e2l',
@@ -114,7 +132,7 @@ elif machine_name == 'rx65n'
 
   run_target(
     'deploy',
-    command: [rfp_cli] + rfp_args + ['-a', boot_srec],
+    command: [rfp_cli] + rfp_args + ['-a', boot_dualbank_srec],
   )
 
   if serial_port_option == ''

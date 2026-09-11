@@ -4,7 +4,7 @@ endif
 
 machine_name = 'rx65n'
 machine_slot0_address = '0xFFE00000'
-machine_slot1_address = '0xFFE40000'
+machine_slot1_address = '0xFFF00000'
 
 machine_hal_sources = files(
   'hal/uart.c',
