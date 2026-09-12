@@ -43,16 +43,12 @@ endforeach
 sign_algo = sign_algorithms[verification]
 
 subdir('boot')
-if machine_name != 'rx65n'
-  subdir('app')
-endif
+subdir('app')
 if machine_name == 'renode-cm4' or machine_name == 'rx261'
   subdir('app_ota')
 endif
 
-if machine_name != 'rx65n'
-  subdir('usecases')
-endif
+subdir('usecases')
 
 if machine_name == 'renode-cm4'
   python_exe = find_program('python3', 'python', required: true)
@@ -149,5 +145,51 @@ elif machine_name == 'rx261'
     endif
   else
     message('rfp-cli not found. RX261 use case run targets will not be available.')
+  endif
+elif machine_name == 'rx65n'
+  rfp_cli = find_program('rfp-cli', required: false)
+
+  if rfp_cli.found()
+    python_exe = find_program('python3', 'python', required: true)
+    serial_port_option = get_option('serial_port')
+
+    if serial_port_option == ''
+      warning('serial_port option not specified. RX65N use case run targets will not be functional.')
+    else
+      usecase_run_script = meson.project_source_root() / 'machines' / 'rx65n' / 'scripts' / 'usecase_run.py'
+      run_script = meson.project_source_root() / 'machines' / 'rx65n' / 'scripts' / 'run.py'
+
+      foreach usecase : all_usecases
+        cmd = [
+          python_exe,
+          usecase_run_script,
+          serial_port_option,
+          '--boot-image', boot_dualbank_srec.full_path(),
+          '--build-dir', meson.current_build_dir(),
+          '--rfp-cli', rfp_cli,
+          '--python-exe', python_exe,
+          '--run-script', run_script,
+          '--display',
+        ]
+
+        if usecase['has_slot0']
+          cmd += ['--slot0-image', usecase['slot0'].full_path()]
+          cmd += ['--slot0-address', machine_slot0_address]
+        endif
+
+        if usecase['has_slot1']
+          cmd += ['--slot1-image', usecase['slot1'].full_path()]
+          cmd += ['--slot1-address', machine_slot1_address]
+        endif
+
+        run_target(
+          'run_' + usecase['name'],
+          command: cmd,
+          depends: usecase['depends'],
+        )
+      endforeach
+    endif
+  else
+    message('rfp-cli not found. RX65N use case run targets will not be available.')
   endif
 endif

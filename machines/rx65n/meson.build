@@ -25,3 +25,5 @@ machine_hal_dep = declare_dependency(
 
 machine_boot_startup = files('startup_boot.c')
 machine_boot_linker = files('linker_boot.ld')
+machine_app_startup = files('startup_app.c')
+machine_app_linker = files('linker_app.ld')

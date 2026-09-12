@@ -10,7 +10,8 @@ all_usecases += [{
   'has_slot1': usecase_has_slot1,
 }]
 
-subdir('higher_version')
+if machine_name != 'rx65n'
+  subdir('higher_version')
 all_usecases += [{
   'name': usecase_name,
   'slot0': usecase_slot0,
@@ -20,7 +21,7 @@ all_usecases += [{
   'has_slot1': usecase_has_slot1,
 }]
 
-subdir('keygen_mix')
+  subdir('keygen_mix')
 all_usecases += [{
   'name': usecase_name,
   'slot0': usecase_slot0,
@@ -29,6 +30,7 @@ all_usecases += [{
   'has_slot0': usecase_has_slot0,
   'has_slot1': usecase_has_slot1,
 }]
+endif
 
 subdir('boot_only')
 all_usecases += [{
