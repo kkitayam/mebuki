@@ -163,6 +163,26 @@ This command:
 
 The UART console displays output similar to the Renode examples above.
 
+## RX65N Use Cases
+
+RX65N supports `run_slot0`, `run_higher_version`, `run_keygen_mix`, and
+`run_boot_only`. Configure the target with the RX65N cross file and the
+connected serial port.
+
+```bash
+uv run meson setup builddir-rx65n \
+    --cross-file cross/rx65n-elf-gcc.ini \
+    -Dtarget=rx65n \
+    -Dserial_port=COM3
+uv run meson compile -C builddir-rx65n run_higher_version
+```
+
+The RX65N runner deploys the boot image to both flash banks and places the
+selected signed application images at the slot0 and slot1 bank addresses.
+`run_higher_version` verifies bank swap after selecting the higher security
+version, and `run_keygen_mix` verifies images signed with different key
+generations. OTA remains unsupported for RX65N.
+
 ## Run the Unit Tests
 
 Configure a native build.
