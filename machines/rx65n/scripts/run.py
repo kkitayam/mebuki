@@ -19,6 +19,41 @@ from typing import Optional
 
 import serial
 
+from ymodem_sender import ymodem_send
+
+
+class SerialYmodemTransport:
+    """Adapt the UART capture to the YMODEM sender interface."""
+
+    def __init__(self, capture, log_file):
+        self.capture = capture
+        self.log_file = log_file
+        self.buffer = bytearray()
+
+    def read(self, size=1, timeout=0.0):
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if self.buffer:
+                data = bytes(self.buffer[:size])
+                del self.buffer[:size]
+                return data
+            if self.capture.pending_uart:
+                data = bytes(self.capture.pending_uart[:size])
+                del self.capture.pending_uart[:size]
+                return data
+            data = self.capture.read_uart(self.log_file)
+            if data:
+                self.capture.captured_uart.extend(data)
+                self.buffer.extend(data)
+            time.sleep(0.001)
+        return b""
+
+    def write(self, data):
+        self.capture.serial.write(data)
+
+    def flush(self):
+        self.capture.serial.flush()
+
 
 class SerialLogCapture:
     """Manages UART log capture and application execution."""
@@ -40,6 +75,8 @@ class SerialLogCapture:
         self.serial = None
         self.rfp_process = None
         self.display = display
+        self.pending_uart = bytearray()
+        self.captured_uart = bytearray()
 
         logging.basicConfig(
             level=logging.INFO,
@@ -114,24 +151,23 @@ class SerialLogCapture:
             with open(self.log_file, "wb") as f:
                 start_time = time.time()
 
-                while time.time() - start_time < self.duration:
-                    if self.serial is not None and self.serial.in_waiting > 0:
-                        try:
-                            data = self.serial.read(self.serial.in_waiting)
-                            f.write(data)
-                            f.flush()
-
-                            if self.display:
-                                try:
-                                    text = data.decode('utf-8', errors='replace')
-                                    sys.stdout.write(text)
-                                    sys.stdout.flush()
-                                except Exception:
-                                    pass
-                        except Exception as e:
-                            self.logger.error(f"Error reading from serial port: {e}")
+                if self.ymodem_image is not None:
+                    if not self.wait_for_marker(f, b"APP_OTA: waiting for YMODEM image...", 30):
+                        self.logger.error("OTA receiver banner was not observed")
+                        return False
+                    image_path = Path(self.ymodem_image)
+                    self.logger.info("Sending signed OTA image: %s", image_path)
+                    transport = SerialYmodemTransport(self, f)
+                    if not ymodem_send(transport, image_path.read_bytes(), image_path.name):
+                        self.logger.error("YMODEM transfer failed")
+                        return False
+                    for marker in (b"APP_OTA: receive OK", b"Slot ID: 1", b"hello world"):
+                        if not self.wait_for_marker(f, marker, 30):
+                            self.logger.error("OTA completion marker was not observed: %s", marker.decode())
                             return False
-                    else:
+
+                while time.time() - start_time < self.duration:
+                    if not self.read_uart(f):
                         time.sleep(0.01)
 
             self.logger.info(f"Log capture completed. Logs saved to: {self.log_file}")
@@ -139,6 +175,34 @@ class SerialLogCapture:
         except Exception as e:
             self.logger.error(f"Failed to capture logs: {e}")
             return False
+
+    def read_uart(self, log_file) -> bytes:
+        """Read immediately available UART bytes and record them."""
+        if self.serial is None or self.serial.in_waiting == 0:
+            return b""
+        data = self.serial.read(self.serial.in_waiting)
+        log_file.write(data)
+        log_file.flush()
+        if self.display:
+            sys.stdout.write(data.decode("utf-8", errors="replace"))
+            sys.stdout.flush()
+        return data
+
+    def wait_for_marker(self, log_file, marker: bytes, timeout: float) -> bool:
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            previous_length = len(self.captured_uart)
+            data = self.read_uart(log_file)
+            if data:
+                self.captured_uart.extend(data)
+            search_start = max(0, previous_length - len(marker) + 1)
+            marker_start = self.captured_uart.find(marker, search_start)
+            if marker_start >= 0:
+                marker_end = marker_start + len(marker)
+                self.pending_uart.extend(self.captured_uart[marker_end:])
+                return True
+            time.sleep(0.01)
+        return False
 
     def wait_for_application(self) -> int:
         """
@@ -172,7 +236,7 @@ class SerialLogCapture:
             except Exception as e:
                 self.logger.error(f"Error terminating application: {e}")
 
-    def run(self, rfp_cli: str, rfp_args: list) -> int:
+    def run(self, rfp_cli: str, rfp_args: list, ymodem_image: Optional[str] = None) -> int:
         """
         Execute the full log capture and application run sequence.
 
@@ -184,6 +248,7 @@ class SerialLogCapture:
             Exit code (0 for success, 1 for failure)
         """
         try:
+            self.ymodem_image = ymodem_image
             if not self.open_serial_port():
                 return 1
 
@@ -242,6 +307,10 @@ def main() -> int:
         action="store_true",
         help="Display UART logs to stdout in addition to saving to file"
     )
+    parser.add_argument(
+        "--ymodem-image",
+        help="Signed image to send after the app_ota banner"
+    )
 
     args = parser.parse_args()
 
@@ -259,7 +328,7 @@ def main() -> int:
         "-run"
     ]
 
-    return capture.run(args.rfp_cli, rfp_args)
+    return capture.run(args.rfp_cli, rfp_args, args.ymodem_image)
 
 
 if __name__ == "__main__":

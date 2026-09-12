@@ -44,12 +44,12 @@ int main(void)
     uart_init();
     hal_flash_init();
 
-    uart_puts("\r\nAPP_OTA: waiting for YMODEM image...\r\n");
-
     if (erase_slot1() != 0) {
         uart_puts("APP_OTA: slot1 erase failed\r\n");
         halt();
     }
+
+    uart_puts("\r\nAPP_OTA: waiting for YMODEM image...\r\n");
 
     const int32_t received = ymodem_receive((uint8_t *)MBK_SLOT1_BASE, MBK_SLOT_SIZE, NULL);
     if (received <= 0) {

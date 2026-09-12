@@ -35,6 +35,8 @@ def main() -> int:
     parser.add_argument("--python-exe", required=True)
     parser.add_argument("--run-script", required=True)
     parser.add_argument("--display", action="store_true")
+    parser.add_argument("--ymodem-image")
+    parser.add_argument("--duration", type=int, default=5)
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -51,6 +53,9 @@ def main() -> int:
         ]
         if args.display:
             command.append("--display")
+        if args.ymodem_image:
+            command += ["--ymodem-image", args.ymodem_image]
+        command += ["--duration", str(args.duration)]
         return subprocess.run(command, check=False).returncode
     except subprocess.CalledProcessError as error:
         LOGGER.error("Deployment failed with exit code %s", error.returncode)

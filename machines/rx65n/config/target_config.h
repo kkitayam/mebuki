@@ -11,9 +11,9 @@
 #define PROGRESS_SIZE       0x00000400U
 
 #define SLOT0_BASE          0xFFE00000U
-#define SLOT0_SIZE          0x000F8000U
+#define SLOT0_SIZE          0x00020000U
 
 #define SLOT1_BASE          0xFFF00000U
-#define SLOT1_SIZE          0x000F8000U
+#define SLOT1_SIZE          0x00020000U
 
 #endif

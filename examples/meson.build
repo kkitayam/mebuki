@@ -44,7 +44,7 @@ sign_algo = sign_algorithms[verification]
 
 subdir('boot')
 subdir('app')
-if machine_name == 'renode-cm4' or machine_name == 'rx261'
+if machine_name == 'renode-cm4' or machine_name == 'rx261' or machine_name == 'rx65n'
   subdir('app_ota')
 endif
 
@@ -180,6 +180,12 @@ elif machine_name == 'rx65n'
         if usecase['has_slot1']
           cmd += ['--slot1-image', usecase['slot1'].full_path()]
           cmd += ['--slot1-address', machine_slot1_address]
+        endif
+        if usecase['name'] == 'ota'
+          cmd += [
+            '--ymodem-image', app_images[2][0].full_path(),
+            '--duration', '30',
+          ]
         endif
 
         run_target(

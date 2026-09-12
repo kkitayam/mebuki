@@ -1,9 +1,9 @@
 mbk_includes = include_directories('include')
 
-mbk_sources = files(
-  'src/mebuki.c',
-  'src/taneue.c',
-)
+mbk_sources = files('src/mebuki.c')
+if get_option('target') != 'rx65n'
+  mbk_sources += files('src/taneue.c')
+endif
 
 mbk_svl_includes = include_directories('src')
 
