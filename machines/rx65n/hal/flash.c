@@ -14,7 +14,7 @@ static size_t flash_erase_size(uintptr_t address)
          address < MBK_DATA0_BASE + MBK_BLOCK_SIZE_BFL) ||
         (address >= MBK_DATA1_BASE &&
          address < MBK_DATA1_BASE + MBK_BLOCK_SIZE_BFL)) {
-        return MBK_BLOCK_SIZE_CODE_FLASH;
+        return MBK_BLOCK_SIZE_SLOT;
     }
 #else
     if ((address >= MBK_DATA0_BASE &&
