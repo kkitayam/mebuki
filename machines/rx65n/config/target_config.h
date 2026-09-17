@@ -4,7 +4,12 @@
 #define FLASH_BASE          0xFFE00000U
 #define FLASH_SIZE          0x00200000U
 
+#if defined(MEBUKI_RX65N_DATA_IN_CODE_FLASH)
+#define BFL_BASE            0xFFFF0000U
+#define BFL_BASE_SWAP       0xFFEF0000U
+#else
 #define BFL_BASE            0x00100000U
+#endif
 #define BFL_SIZE            0x00000100U
 
 #define PROGRESS_BASE       0x00100400U

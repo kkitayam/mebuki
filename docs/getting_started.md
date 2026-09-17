@@ -177,6 +177,11 @@ uv run meson setup builddir-rx65n \
 uv run meson compile -C builddir-rx65n run_higher_version
 ```
 
+The default `rx65n_data_location=dataflash` stores the boot flash-level data
+in Data Flash. To store it in the two Code Flash sectors immediately before
+the boot image and its bank-swap pair, configure the build with
+`-Drx65n_data_location=codeflash`.
+
 The RX65N runner deploys the boot image to both flash banks and places the
 selected signed application images at the slot0 and slot1 bank addresses.
 `run_higher_version` verifies bank swap after selecting the higher security

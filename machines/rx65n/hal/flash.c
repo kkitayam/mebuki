@@ -9,11 +9,22 @@
 
 static size_t flash_erase_size(uintptr_t address)
 {
+#if defined(MEBUKI_RX65N_DATA_IN_CODE_FLASH)
     if ((address >= MBK_DATA0_BASE &&
-         address < MBK_DATA0_BASE + MBK_BLOCK_SIZE_BFL * 2U) ||
-        (address >= TANEUE_PROGRESS_BASE &&
-         address < TANEUE_PROGRESS_BASE + TANEUE_PROGRESS_SIZE)) {
+         address < MBK_DATA0_BASE + MBK_BLOCK_SIZE_BFL) ||
+        (address >= MBK_DATA1_BASE &&
+         address < MBK_DATA1_BASE + MBK_BLOCK_SIZE_BFL)) {
+        return MBK_BLOCK_SIZE_CODE_FLASH;
+    }
+#else
+    if ((address >= MBK_DATA0_BASE &&
+         address < MBK_DATA0_BASE + MBK_BLOCK_SIZE_BFL * 2U)) {
         return MBK_BLOCK_SIZE_BFL;
+    }
+#endif
+    if (address >= TANEUE_PROGRESS_BASE &&
+        address < TANEUE_PROGRESS_BASE + TANEUE_PROGRESS_SIZE) {
+        return MBK_BLOCK_SIZE_PROGRESS;
     }
     return MBK_BLOCK_SIZE_SLOT;
 }

@@ -21,3 +21,9 @@ option('serial_port',
   value: '',
   description: 'Serial port for hardware run targets (e.g., COM3)',
 )
+option('rx65n_data_location',
+  type: 'combo',
+  choices: ['dataflash', 'codeflash'],
+  value: 'dataflash',
+  description: 'RX65N MBK_DATA0/1 storage location',
+)

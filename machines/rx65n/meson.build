@@ -2,6 +2,10 @@ if host_machine.cpu_family() != 'rx'
   error('unexpected target machine. expected cpu_family=rx / actual: ' + host_machine.cpu_family())
 endif
 
+if get_option('rx65n_data_location') == 'codeflash'
+  add_project_arguments('-DMEBUKI_RX65N_DATA_IN_CODE_FLASH=1', language: 'c')
+endif
+
 machine_name = 'rx65n'
 machine_slot0_address = '0xFFE00000'
 machine_slot1_address = '0xFFF00000'
