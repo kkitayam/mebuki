@@ -6,7 +6,7 @@
  *
  * Target: RX65N (R5F565NEDDFP) Flash Type 4
  * ICLK 120 MHz / FCLK 60 MHz
- * CF 2 MiB (32 KiB blocks, 128 B program)
+ * CF 2 MiB (8/32 KiB blocks by region, 128 B program)
  * DF 32 KiB (64 B blocks, 4 B program)
  */
 #include "flash_type4.h"
@@ -16,8 +16,20 @@
 /* ---------- constants (RX65N 2 MiB CF / 32 KiB DF) ---------- */
 #define CF_START          (0xFFE00000u)
 #define CF_END            (0xFFFFFFFFu)
-#define CF_BLOCK_SIZE     (0x8000u)      /* 32 KiB */
+#define CF_BLOCK_8K       (0x2000u)      /* 8 KiB */
+#define CF_BLOCK_32K      (0x8000u)      /* 32 KiB */
 #define CF_WRITE_UNIT     (128u)
+
+/*
+ * 8 Kbyte erase regions (Hardware Manual sec. 59.2):
+ *   Linear (BANKMD=111b): blocks 0-7  at 0xFFFF0000-0xFFFFFFFF
+ *   Dual   (BANKMD=000b): blocks 0-7  at 0xFFFF0000-0xFFFFFFFF
+ *                         blocks 38-45 at 0xFFEE0000-0xFFEFFFFF
+ * All other CF blocks are 32 Kbyte.
+ */
+#define CF_8K_HI_START    (0xFFFF0000u)
+#define CF_8K_LO_START    (0xFFEE0000u)
+#define CF_8K_REGION      (0x10000u)     /* 64 KiB = 8 x 8 KiB */
 
 #define DF_START          (0x00100000u)
 #define DF_END            (0x00107FFFu)
@@ -130,59 +142,61 @@ static bool mem_is_blank(const void *addr, size_t nbytes)
 }
 
 /* ---------- DF write (XIP) ---------- */
+/* size is 4-byte multiple; pad short units with 0xFFFF. */
 static int df_write(uintptr_t addr, const uint8_t *src, size_t size)
 {
-    int err;
-    err = pe_enter_df();
-    if (err) return err;
+    if (pe_enter_df() != 0)
+        return FLASH_TYPE4_ERR_FAILURE;
 
     int rc = 0;
-    for (size_t done = 0; rc == 0 && done < size; ) {
-        size_t n = DF_WRITE_UNIT;
-        if (done + n > size)
-            n = size - done;
-
+    for (size_t done = 0; rc == 0 && done < size; done += DF_WRITE_UNIT) {
         FLASH.FSADDR.LONG = (uint32_t)(addr + done);
         FACI_CMD_AREA.BYTE = FACI_CMD_PROGRAM;
-        FACI_CMD_AREA.BYTE = (uint8_t)(n / 2);
+        FACI_CMD_AREA.BYTE = (uint8_t)(DF_WRITE_UNIT / 2);
 
         const uint16_t *p = (const uint16_t *)(src + done);
-        for (size_t i = 0; i < n / 2; i++)
+        size_t words = (size - done > DF_WRITE_UNIT)
+                       ? (DF_WRITE_UNIT / 2)
+                       : ((size - done) / 2);
+        size_t i;
+        for (i = 0; i < words; i++)
             FACI_CMD_AREA.WORD = p[i];
+        for (; i < DF_WRITE_UNIT / 2; i++)
+            FACI_CMD_AREA.WORD = 0xFFFFu;
 
         FACI_CMD_AREA.BYTE = FACI_CMD_END;
         rc = wait_frdy(US_TO_LOOPS(2000));
-        done += n;
     }
     pe_exit();
     return rc;
 }
 
 /* ---------- CF write (RAM section) ---------- */
+/* Always programs full 128 B units; short tail padded with 0xFFFF. */
 FLASH_TYPE4_PE_RAM_ATTR
 static int cf_write(uintptr_t addr, const uint8_t *src, size_t size)
 {
-    int err;
-    err = pe_enter_cf();
-    if (err) return err;
+    if (pe_enter_cf() != 0)
+        return FLASH_TYPE4_ERR_FAILURE;
 
     int rc = 0;
-    for (size_t done = 0; rc == 0 && done < size; ) {
-        size_t n = CF_WRITE_UNIT;
-        if (done + n > size)
-            n = size - done;
-
+    for (size_t done = 0; rc == 0 && done < size; done += CF_WRITE_UNIT) {
         FLASH.FSADDR.LONG = (uint32_t)(addr + done);
         FACI_CMD_AREA.BYTE = FACI_CMD_PROGRAM;
-        FACI_CMD_AREA.BYTE = (uint8_t)(n / 2);
+        FACI_CMD_AREA.BYTE = (uint8_t)(CF_WRITE_UNIT / 2);  /* N = 64 words */
 
         const uint16_t *p = (const uint16_t *)(src + done);
-        for (size_t i = 0; i < n / 2; i++)
+        size_t words = (size - done > CF_WRITE_UNIT)
+                       ? (CF_WRITE_UNIT / 2)
+                       : ((size - done) / 2);
+        size_t i;
+        for (i = 0; i < words; i++)
             FACI_CMD_AREA.WORD = p[i];
+        for (; i < CF_WRITE_UNIT / 2; i++)
+            FACI_CMD_AREA.WORD = 0xFFFFu;
 
         FACI_CMD_AREA.BYTE = FACI_CMD_END;
         rc = wait_frdy_ram(US_TO_LOOPS(5000));
-        done += n;
     }
     pe_exit_ram();
     return rc;
@@ -206,19 +220,81 @@ static int df_erase(uintptr_t start, uintptr_t end)
     return rc;
 }
 
-FLASH_TYPE4_PE_RAM_ATTR
-static int cf_erase(uintptr_t start, uintptr_t end)
+/* dual: true if BANKMD[2:0]==000b. Pure helper (no OFSM). */
+static size_t cf_block_size_at(uintptr_t addr, bool dual)
 {
-    int err;
-    err = pe_enter_cf();
-    if (err) return err;
+    if (addr >= CF_8K_HI_START)
+        return CF_BLOCK_8K;
+    if (dual
+        && addr >= CF_8K_LO_START
+        && addr < (CF_8K_LO_START + CF_8K_REGION))
+        return CF_BLOCK_8K;
+    return CF_BLOCK_32K;
+}
+
+static uintptr_t cf_block_start(uintptr_t addr, bool dual)
+{
+    size_t bs = cf_block_size_at(addr, dual);
+    return addr & ~(uintptr_t)(bs - 1u);
+}
+
+/*
+ * Bytes from block-start of `first` through end of block containing `last`.
+ * Avoids exclusive-end pointers past 0xFFFFFFFF (32-bit overflow).
+ */
+static size_t cf_aligned_span(uintptr_t first, uintptr_t last, bool dual)
+{
+    uintptr_t s = cf_block_start(first, dual);
+    uintptr_t e = cf_block_start(last, dual);
+    return (size_t)(e - s) + cf_block_size_at(last, dual);
+}
+
+/*
+ * Erase CF blocks covering `total` bytes from `start` (block-aligned).
+ * dual must be resolved from OFSM *before* pe_enter_cf.
+ * Branching is outside the per-block for; each homogeneous region uses a fixed step.
+ * Uses remaining-byte count (not exclusive end) so the top 8K region cannot wrap to 0.
+ */
+FLASH_TYPE4_PE_RAM_ATTR
+static int cf_erase(uintptr_t start, size_t total, bool dual)
+{
+    if (pe_enter_cf() != 0)
+        return FLASH_TYPE4_ERR_FAILURE;
 
     int rc = 0;
-    for (; rc == 0 && start < end; start += CF_BLOCK_SIZE) {
-        FLASH.FSADDR.LONG = (uint32_t)start;
-        FACI_CMD_AREA.BYTE = FACI_CMD_ERASE;
-        FACI_CMD_AREA.BYTE = FACI_CMD_END;
-        rc = wait_frdy_ram(US_TO_LOOPS(30000));
+    uintptr_t addr = start;
+    size_t done = 0;
+
+    while (rc == 0 && done < total) {
+        size_t bs;
+        size_t region_left;
+
+        if (addr >= CF_8K_HI_START) {
+            bs = CF_BLOCK_8K;
+            region_left = total - done;
+        } else if (dual
+                   && addr >= CF_8K_LO_START
+                   && addr < (CF_8K_LO_START + CF_8K_REGION)) {
+            bs = CF_BLOCK_8K;
+            region_left = (CF_8K_LO_START + CF_8K_REGION) - addr;
+            if (region_left > total - done)
+                region_left = total - done;
+        } else {
+            bs = CF_BLOCK_32K;
+            uintptr_t boundary = (dual && addr < CF_8K_LO_START)
+                                 ? CF_8K_LO_START
+                                 : CF_8K_HI_START;
+            region_left = boundary - addr;
+            if (region_left > total - done)
+                region_left = total - done;
+        }
+
+        for (; rc == 0 && region_left > 0; region_left -= bs, done += bs, addr += bs) {
+            FLASH.FSADDR.LONG = (uint32_t)addr;
+            FACI_CMD_AREA.BYTE = FACI_CMD_ERASE;
+            FACI_CMD_AREA.BYTE = FACI_CMD_END;
+            rc = wait_frdy_ram(US_TO_LOOPS(30000));
+        }
     }
     pe_exit_ram();
     return rc;
@@ -291,15 +367,19 @@ int flash_type4_write(uintptr_t address, const void *data, size_t size)
 {
     if (data == 0 || size == 0)
         return FLASH_TYPE4_ERR_PARAM;
+    /* size: 4-byte units; short HW program units are padded with 0xFFFF */
+    if ((size & 3u) != 0)
+        return FLASH_TYPE4_ERR_ALIGN;
 
     if (address >= DF_START && (address + size - 1) <= DF_END) {
-        if ((address & (DF_WRITE_UNIT - 1)) != 0 || (size & (DF_WRITE_UNIT - 1)) != 0)
+        if ((address & (DF_WRITE_UNIT - 1)) != 0)
             return FLASH_TYPE4_ERR_ALIGN;
         return df_write(address, (const uint8_t *)data, size);
     }
 
     if (address >= CF_START && (address + size - 1) <= CF_END) {
-        if ((address & (CF_WRITE_UNIT - 1)) != 0 || (size & (CF_WRITE_UNIT - 1)) != 0)
+        /* address still on CF program boundary (128 B) */
+        if ((address & (CF_WRITE_UNIT - 1)) != 0)
             return FLASH_TYPE4_ERR_ALIGN;
         return cf_write(address, (const uint8_t *)data, size);
     }
@@ -324,14 +404,17 @@ int flash_type4_erase(uintptr_t address, size_t size)
     }
 
     if (address >= CF_START && address <= CF_END) {
-        uintptr_t start = address & ~(CF_BLOCK_SIZE - 1);
-        uintptr_t end   = (address + size + CF_BLOCK_SIZE - 1) & ~(CF_BLOCK_SIZE - 1);
-        if (end - 1 > CF_END)
+        /* OFSM must be read before CF P/E mode */
+        bool dual = (OFSM.MDE.BIT.BANKMD == 0);
+        uintptr_t last = address + size - 1u;
+        if (last < address || last > CF_END)
             return FLASH_TYPE4_ERR_PARAM;
-        int rc = cf_erase(start, end);
+        uintptr_t start = cf_block_start(address, dual);
+        size_t total = cf_aligned_span(address, last, dual);
+        int rc = cf_erase(start, total, dual);
         if (rc != 0)
             return rc;
-        return (int)(end - start);
+        return (int)total;
     }
 
     return FLASH_TYPE4_ERR_PARAM;

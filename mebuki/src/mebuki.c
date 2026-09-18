@@ -411,7 +411,7 @@ STATIC int bfl_store_entry(struct mbk_bfl_entry* inout)
     /* Write to the alternate configured sector (ping-pong update). */
     uintptr_t target_addr;
     const uint32_t c = inout->integrity;
-    if (!(is_blank & (1U << 0)) && c == sec0->entry.integrity) {
+    if ((is_blank == 3u) || (!(is_blank & (1U << 0)) && c == sec0->entry.integrity)) {
         target_addr = MBK_DATA1_BASE;
     } else if (!(is_blank & (1U << 1)) && c == sec1->entry.integrity) {
         target_addr = MBK_DATA0_BASE;
@@ -426,12 +426,13 @@ STATIC int bfl_store_entry(struct mbk_bfl_entry* inout)
     next.integrity = bfl_compute_record_integrity(&next);
 
     err = hal_flash_erase_sector(target_addr);
-    if (err != 0) {
+    if (err < 0) {
         MBK_LOG("BFL store failed: erase sector failed\n");
         return MBK_BFL_ERROR_ERASE_FAILED;
     }
     err = hal_flash_write(target_addr, &next, sizeof(next));
-    if (err != 0) {
+    if (err < 0) {
+        extern void put_error_code(const char* message, int code);
         MBK_LOG("BFL store failed: write failed\n");
         return MBK_BFL_ERROR_WRITE_FAILED;
     }
