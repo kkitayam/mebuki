@@ -3,7 +3,7 @@ if not sign_algorithms.has_key(verification)
   error('Unsupported SVL: @0@'.format(verification))
 endif
 
-if machine_name != 'renode-cm4' and machine_name != 'rx261' and machine_name != 'rx65n'
+if machine_name != 'renode-cm4' and machine_name != 'rx261' and machine_name != 'rx65n' and machine_name != 'msp432e4'
   error('Unsupported machine for examples: @0@'.format(machine_name))
 endif
 

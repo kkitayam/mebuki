@@ -1,6 +1,6 @@
 option('target',
   type: 'combo',
-  choices: ['all', 'renode-cm4', 'cm4', 'rx261', 'rx65n'],
+  choices: ['all', 'renode-cm4', 'cm4', 'rx261', 'rx65n', 'msp432e4'],
   value: 'all',
   description: 'Target machine to build',
 )
