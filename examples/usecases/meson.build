@@ -58,7 +58,7 @@ if machine_name == 'msp432e4'
   }]
 endif
 
-if machine_name == 'renode-cm4' or machine_name == 'rx261' or machine_name == 'rx65n'
+if machine_name == 'renode-cm4' or machine_name == 'rx261' or machine_name == 'rx65n' or machine_name == 'msp432e4'
   subdir('ota')
   all_usecases += [{
     'name': usecase_name,

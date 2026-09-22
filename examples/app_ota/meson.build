@@ -19,6 +19,7 @@ app_ota_exe = executable(
     '-Wl,-Map=' + meson.current_build_dir() / 'app_ota.map',
   ],
   link_depends: machine_app_linker,
+  c_args: machine_name == 'msp432e4' ? ['-DMSP432E4_STARTUP_INITIALIZES_SYSTEM=1'] : [],
   name_suffix: 'elf',
 )
 

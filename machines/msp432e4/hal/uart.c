@@ -46,3 +46,14 @@ void uart_puts(const char *string)
     while ((UART0->FR & UART_FR_BUSY) != 0U) {
     }
 }
+
+int uart_getc_timeout(uint32_t timeout_ms)
+{
+    uint32_t cycles = timeout_ms * 120000U;
+    while (cycles-- > 0U) {
+        if ((UART0->FR & UART_FR_RXFE) == 0U) {
+            return (int)(UART0->DR & 0xFFU);
+        }
+    }
+    return -1;
+}

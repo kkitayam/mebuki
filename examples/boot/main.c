@@ -174,6 +174,7 @@ int main(void)
 
     uart_puts("  Entry Point: 0x");
     uint32_t entry = boot_info.entry_point;
+    uint32_t handoff_entry = entry;
     put_hex(entry, true);
     uart_puts("\r\n");
 
@@ -201,6 +202,7 @@ int main(void)
         }
 #ifdef MEBUKI_BOOT_USE_MSP432E4_BANK_SWAP
         uart_puts("Flash bank swapped\r\n");
+        handoff_entry = MBK_SLOT0_BASE + MBK_HEADER_SIZE;
 #endif
 #else
         enum taneue_result result = taneue_schedule_swap();
@@ -216,7 +218,7 @@ int main(void)
     }
 
     prepare_handoff();
-    jump_to_firmware(boot_info.entry_point);
+    jump_to_firmware(handoff_entry);
 
     /* unreachable */
     halt();

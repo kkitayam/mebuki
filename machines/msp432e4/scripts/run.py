@@ -11,6 +11,29 @@ from typing import BinaryIO
 
 import serial
 
+from ymodem_sender import ymodem_send
+
+
+class SerialTransport:
+    """Adapt pyserial to the timeout-aware YMODEM transport interface."""
+
+    def __init__(self, serial_port: serial.Serial) -> None:
+        self.serial_port = serial_port
+
+    def read(self, size: int, timeout: float) -> bytes:
+        previous_timeout = self.serial_port.timeout
+        self.serial_port.timeout = max(0.0, timeout)
+        try:
+            return self.serial_port.read(size)
+        finally:
+            self.serial_port.timeout = previous_timeout
+
+    def write(self, data: bytes) -> int:
+        return self.serial_port.write(data)
+
+    def flush(self) -> None:
+        self.serial_port.flush()
+
 
 class SerialLogCapture:
     """Deploy an image and collect UART output."""
@@ -24,6 +47,7 @@ class SerialLogCapture:
         duration: int,
         log_file: Path | None,
         expected: str | None,
+        ymodem_image: Path | None,
     ) -> None:
         self.serial_port = serial_port
         self.dslite = dslite
@@ -32,6 +56,8 @@ class SerialLogCapture:
         self.duration = duration
         self.log_file = log_file
         self.expected = expected
+        self.ymodem_image = ymodem_image
+        self.ota_ready = False
         self.captured = bytearray()
         self.serial_port_handle: serial.Serial | None = None
         self.logger = logging.getLogger(__name__)
@@ -60,7 +86,8 @@ class SerialLogCapture:
         if byte_count == 0:
             return
 
-        data = self.serial_port_handle.read(byte_count)
+        read_count = 1 if self.ymodem_image is not None and not self.ota_ready else byte_count
+        data = self.serial_port_handle.read(read_count)
         self.captured.extend(data)
         if log_file is not None:
             log_file.write(data)
@@ -68,6 +95,8 @@ class SerialLogCapture:
 
         sys.stdout.write(data.decode("utf-8", errors="replace"))
         sys.stdout.flush()
+        if self.ymodem_image is not None and b"APP_OTA: waiting for YMODEM image" in self.captured:
+            self.ota_ready = True
 
     def deploy(self, log_file: BinaryIO | None) -> int:
         """Run dslite while observing UART output."""
@@ -83,12 +112,39 @@ class SerialLogCapture:
             self.capture_available(log_file)
             time.sleep(0.01)
 
-        self.capture_available(log_file)
+        if self.ymodem_image is not None and not self.ota_ready:
+            deadline = time.monotonic() + 10.0
+            while time.monotonic() < deadline and not self.ota_ready:
+                self.capture_available(log_file)
+                time.sleep(0.01)
+
+        if self.ymodem_image is not None and self.ota_ready:
+            if self.send_ymodem():
+                self.ymodem_image = None
+            else:
+                return 1
+        else:
+            self.capture_available(log_file)
         if process.returncode != 0:
             self.logger.error("dslite exited with return code: %d", process.returncode)
             return process.returncode
 
         return 0
+
+    def send_ymodem(self) -> bool:
+        """Send the configured OTA image after the receiver banner."""
+        if self.ymodem_image is None or self.serial_port_handle is None:
+            return False
+        image = self.ymodem_image.read_bytes()
+        self.logger.info("Sending YMODEM image: %s", self.ymodem_image)
+        if not ymodem_send(
+            SerialTransport(self.serial_port_handle),
+            image,
+            self.ymodem_image.name,
+        ):
+            self.logger.error("YMODEM transfer failed")
+            return False
+        return True
 
     def capture_for_duration(self, log_file: BinaryIO | None) -> None:
         """Capture UART output for the configured duration."""
@@ -171,6 +227,11 @@ def main() -> int:
         "--expect",
         help="Require this text in the captured UART output",
     )
+    parser.add_argument(
+        "--ymodem-image",
+        type=Path,
+        help="Signed image to send after the OTA receiver starts",
+    )
     args = parser.parse_args()
 
     if args.duration < 0:
@@ -187,6 +248,7 @@ def main() -> int:
         args.duration,
         args.log_file,
         args.expect,
+        args.ymodem_image,
     )
     return capture.run()
 

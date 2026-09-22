@@ -44,7 +44,7 @@ sign_algo = sign_algorithms[verification]
 
 subdir('boot')
 subdir('app')
-if machine_name == 'renode-cm4' or machine_name == 'rx261' or machine_name == 'rx65n'
+if machine_name == 'renode-cm4' or machine_name == 'rx261' or machine_name == 'rx65n' or machine_name == 'msp432e4'
   subdir('app_ota')
 endif
 
@@ -223,7 +223,7 @@ elif machine_name == 'msp432e4'
     )
 
     foreach usecase : all_usecases
-      if usecase['name'] == 'slot0' or usecase['name'] == 'higher_version' or usecase['name'] == 'keygen_mix'
+      if usecase['name'] == 'slot0' or usecase['name'] == 'higher_version' or usecase['name'] == 'keygen_mix' or usecase['name'] == 'ota'
         slot0_srec = custom_target(
           usecase['name'] + '_slot0_srec',
           input: usecase['slot0'],
@@ -237,19 +237,38 @@ elif machine_name == 'msp432e4'
             '@OUTPUT@',
           ],
         )
-        slot1_srec = custom_target(
-          usecase['name'] + '_slot1_srec',
-          input: usecase['slot1'],
-          output: usecase['name'] + '_slot1.srec',
-          command: [
-            objcopy,
-            '-I', 'binary',
-            '-O', 'srec',
-            '--adjust-vma=' + machine_slot1_address,
-            '@INPUT@',
-            '@OUTPUT@',
-          ],
-        )
+        firmware_command = [
+          '--firmware', boot_exe,
+          '--firmware', boot_bank1_srec,
+          '--firmware', slot0_srec,
+        ]
+        depends = usecase['depends'] + [boot_bank1_srec, slot0_srec]
+        if usecase['has_slot1']
+          slot1_srec = custom_target(
+            usecase['name'] + '_slot1_srec',
+            input: usecase['slot1'],
+            output: usecase['name'] + '_slot1.srec',
+            command: [
+              objcopy,
+              '-I', 'binary',
+              '-O', 'srec',
+              '--adjust-vma=' + machine_slot1_address,
+              '@INPUT@',
+              '@OUTPUT@',
+            ],
+          )
+          firmware_command += ['--firmware', slot1_srec]
+          depends += [slot1_srec]
+        endif
+        extra_args = []
+        if usecase['name'] == 'ota'
+          extra_args = [
+            '--ymodem-image', app_images[2][0],
+            '--expect', 'hello world',
+          ]
+        else
+          extra_args = ['--expect', 'hello world']
+        endif
         run_target(
           'run_' + usecase['name'],
           command: [
@@ -258,14 +277,10 @@ elif machine_name == 'msp432e4'
             serial_port_option,
             '--dslite', dslite,
             '--ccxml', ccxml,
-            '--firmware', boot_exe,
-            '--firmware', boot_bank1_srec,
-            '--firmware', slot0_srec,
-            '--firmware', slot1_srec,
+          ] + firmware_command + [
             '--log-file', meson.current_build_dir() / ('uart_' + usecase['name'] + '.log'),
-            '--expect', 'hello world',
-          ],
-          depends: usecase['depends'] + [boot_bank1_srec, slot0_srec, slot1_srec],
+          ] + extra_args,
+          depends: depends,
         )
       endif
     endforeach
