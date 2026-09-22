@@ -209,18 +209,43 @@ elif machine_name == 'msp432e4'
   if dslite.found()
     ccxml = files('../machines/msp432e4/scripts/MSP432E401Y.ccxml')
     run_script = files('../machines/msp432e4/scripts/run.py')
+    boot_bank1_srec = custom_target(
+      'boot_bank1_srec',
+      input: boot_exe,
+      output: 'boot_bank1.srec',
+      command: [
+        objcopy,
+        '-O', 'srec',
+        '--adjust-vma=0x00080000',
+        '@INPUT@',
+        '@OUTPUT@',
+      ],
+    )
 
     foreach usecase : all_usecases
-      if usecase['name'] == 'slot0'
+      if usecase['name'] == 'slot0' or usecase['name'] == 'higher_version'
         slot0_srec = custom_target(
-          'slot0_srec',
+          usecase['name'] + '_slot0_srec',
           input: usecase['slot0'],
-          output: 'slot0.srec',
+          output: usecase['name'] + '_slot0.srec',
           command: [
             objcopy,
             '-I', 'binary',
             '-O', 'srec',
             '--adjust-vma=' + machine_slot0_address,
+            '@INPUT@',
+            '@OUTPUT@',
+          ],
+        )
+        slot1_srec = custom_target(
+          usecase['name'] + '_slot1_srec',
+          input: usecase['slot1'],
+          output: usecase['name'] + '_slot1.srec',
+          command: [
+            objcopy,
+            '-I', 'binary',
+            '-O', 'srec',
+            '--adjust-vma=' + machine_slot1_address,
             '@INPUT@',
             '@OUTPUT@',
           ],
@@ -234,11 +259,13 @@ elif machine_name == 'msp432e4'
             '--dslite', dslite,
             '--ccxml', ccxml,
             '--firmware', boot_exe,
+            '--firmware', boot_bank1_srec,
             '--firmware', slot0_srec,
-            '--log-file', meson.current_build_dir() / 'uart_slot0.log',
+            '--firmware', slot1_srec,
+            '--log-file', meson.current_build_dir() / ('uart_' + usecase['name'] + '.log'),
             '--expect', 'hello world',
           ],
-          depends: usecase['depends'] + [slot0_srec],
+          depends: usecase['depends'] + [boot_bank1_srec, slot0_srec, slot1_srec],
         )
       endif
     endforeach

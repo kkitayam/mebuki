@@ -12,7 +12,11 @@
 #include "taneue.h"
 
 #ifdef MEBUKI_BOOT_USE_BANK_SWAP
+#ifdef MEBUKI_BOOT_USE_MSP432E4_BANK_SWAP
+#include "msp432e401y_flash.h"
+#else
 #include "flash_type4.h"
+#endif
 #endif
 
 void uart_printf(const char* fmt, ...)
@@ -186,11 +190,18 @@ int main(void)
         /* The application software is built to run from slot0, so a swap is necessary when booting from slot1 */
         uart_puts("Scheduling slot swap...\r\n");
 #ifdef MEBUKI_BOOT_USE_BANK_SWAP
+#ifdef MEBUKI_BOOT_USE_MSP432E4_BANK_SWAP
+        int swap_result = msp432_flash_swap_bank();
+#else
         int swap_result = flash_type4_swap_bank();
+#endif
         if (swap_result != 0) {
             put_error_code("ERROR: Failed to swap flash bank (code: ", swap_result);
             halt();
         }
+#ifdef MEBUKI_BOOT_USE_MSP432E4_BANK_SWAP
+        uart_puts("Flash bank swapped\r\n");
+#endif
 #else
         enum taneue_result result = taneue_schedule_swap();
         if (result != TANEUE_SUCCESS) {
@@ -199,7 +210,9 @@ int main(void)
         }
 #endif
         uart_puts("Slot swap scheduled\r\n");
+#ifndef MEBUKI_BOOT_USE_MSP432E4_BANK_SWAP
         system_reset();  /* swap operation is deferred until the next boot */
+#endif
     }
 
     prepare_handoff();

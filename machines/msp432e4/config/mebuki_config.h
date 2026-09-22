@@ -32,6 +32,10 @@ _Static_assert((BFL_DATA1_BASE % FLASH_ERASE_SIZE) == 0U, "BFL_DATA1 must be sec
 _Static_assert((PROGRESS_BASE % FLASH_ERASE_SIZE) == 0U, "progress must be sector aligned");
 _Static_assert((SLOT0_BASE % FLASH_ERASE_SIZE) == 0U, "slot0 must be sector aligned");
 _Static_assert((SLOT1_BASE % FLASH_ERASE_SIZE) == 0U, "slot1 must be sector aligned");
+_Static_assert((SLOT0_BASE + SLOT0_SIZE) <= 0x00080000U,
+               "slot0 must fit below the bank 0 boot mirror");
+_Static_assert(SLOT1_BASE >= 0x00088000U,
+               "slot1 must not overlap the bank 1 boot mirror");
 _Static_assert((SLOT1_BASE + SLOT1_SIZE) <= (MBK_FLASH_BASE + MBK_FLASH_SIZE), "slot1 exceeds flash");
 
 #endif

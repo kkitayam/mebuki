@@ -14,7 +14,6 @@ all_usecases += [{
   'has_slot1': usecase_has_slot1,
 }]
 
-if machine_name != 'msp432e4'
 subdir('higher_version')
 all_usecases += [{
   'name': usecase_name,
@@ -24,7 +23,6 @@ all_usecases += [{
   'has_slot0': usecase_has_slot0,
   'has_slot1': usecase_has_slot1,
 }]
-endif
 
 if machine_name != 'msp432e4'
 subdir('keygen_mix')

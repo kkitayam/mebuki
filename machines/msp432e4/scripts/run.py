@@ -176,6 +176,8 @@ def main() -> int:
     if args.duration < 0:
         parser.error("--duration must not be negative")
 
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(errors="replace")
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     capture = SerialLogCapture(
         args.serial_port,

@@ -16,7 +16,7 @@
 
 #define SLOT0_BASE          0x00020000U
 #define SLOT0_SIZE          0x00040000U
-#define SLOT1_BASE          0x00080000U
+#define SLOT1_BASE          0x000A0000U
 #define SLOT1_SIZE          0x00040000U
 
 #endif

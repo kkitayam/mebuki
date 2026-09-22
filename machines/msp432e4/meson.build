@@ -4,7 +4,7 @@ endif
 
 machine_name = 'msp432e4'
 machine_slot0_address = '0x00020000'
-machine_slot1_address = '0x00080000'
+machine_slot1_address = '0x000A0000'
 
 machine_hal_sources = files(
   'hal/uart.c',

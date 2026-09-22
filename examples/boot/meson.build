@@ -15,7 +15,11 @@ boot_c_args = []
 if machine_name == 'rx65n'
   boot_c_args += ['-DMEBUKI_BOOT_USE_BANK_SWAP=1']
 elif machine_name == 'msp432e4'
-  boot_c_args += ['-DMSP432E4_STARTUP_INITIALIZES_SYSTEM=1']
+  boot_c_args += [
+    '-DMSP432E4_STARTUP_INITIALIZES_SYSTEM=1',
+    '-DMEBUKI_BOOT_USE_BANK_SWAP=1',
+    '-DMEBUKI_BOOT_USE_MSP432E4_BANK_SWAP=1',
+  ]
 endif
 
 boot_exe = executable(
