@@ -20,7 +20,7 @@ class SerialLogCapture:
         serial_port: str,
         dslite: str,
         ccxml: str,
-        firmware: str,
+        firmware: list[str],
         duration: int,
         log_file: Path | None,
         expected: str | None,
@@ -71,7 +71,7 @@ class SerialLogCapture:
 
     def deploy(self, log_file: BinaryIO | None) -> int:
         """Run dslite while observing UART output."""
-        command = [self.dslite, "-c", self.ccxml, "-u", self.firmware]
+        command = [self.dslite, "-c", self.ccxml, "-u", *self.firmware]
         self.logger.info("Deploying firmware: %s", " ".join(command))
         try:
             process = subprocess.Popen(command)
@@ -152,8 +152,9 @@ def main() -> int:
     )
     parser.add_argument(
         "--firmware",
+        action="append",
         required=True,
-        help="Path to the firmware ELF file",
+        help="Path to a firmware file; may be specified multiple times",
     )
     parser.add_argument(
         "--duration",

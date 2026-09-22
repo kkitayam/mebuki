@@ -198,4 +198,51 @@ elif machine_name == 'rx65n'
   else
     message('rfp-cli not found. RX65N use case run targets will not be available.')
   endif
+elif machine_name == 'msp432e4'
+  dslite = find_program('dslite', required: false)
+  python_exe = find_program('python3', 'python', required: true)
+  serial_port_option = get_option('serial_port')
+  if serial_port_option == ''
+    serial_port_option = 'COM5'
+  endif
+
+  if dslite.found()
+    ccxml = files('../machines/msp432e4/scripts/MSP432E401Y.ccxml')
+    run_script = files('../machines/msp432e4/scripts/run.py')
+
+    foreach usecase : all_usecases
+      if usecase['name'] == 'slot0'
+        slot0_srec = custom_target(
+          'slot0_srec',
+          input: usecase['slot0'],
+          output: 'slot0.srec',
+          command: [
+            objcopy,
+            '-I', 'binary',
+            '-O', 'srec',
+            '--adjust-vma=' + machine_slot0_address,
+            '@INPUT@',
+            '@OUTPUT@',
+          ],
+        )
+        run_target(
+          'run_' + usecase['name'],
+          command: [
+            python_exe,
+            run_script,
+            serial_port_option,
+            '--dslite', dslite,
+            '--ccxml', ccxml,
+            '--firmware', boot_exe,
+            '--firmware', slot0_srec,
+            '--log-file', meson.current_build_dir() / 'uart_slot0.log',
+            '--expect', 'hello world',
+          ],
+          depends: usecase['depends'] + [slot0_srec],
+        )
+      endif
+    endforeach
+  else
+    warning('dslite not found. MSP432E4 use case run targets are unavailable.')
+  endif
 endif
