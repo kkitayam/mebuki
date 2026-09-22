@@ -223,7 +223,7 @@ elif machine_name == 'msp432e4'
     )
 
     foreach usecase : all_usecases
-      if usecase['name'] == 'slot0' or usecase['name'] == 'higher_version'
+      if usecase['name'] == 'slot0' or usecase['name'] == 'higher_version' or usecase['name'] == 'keygen_mix'
         slot0_srec = custom_target(
           usecase['name'] + '_slot0_srec',
           input: usecase['slot0'],
