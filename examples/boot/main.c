@@ -104,7 +104,9 @@ int main(void)
 {
     uint32_t cnt;
 
+#ifndef MSP432E4_STARTUP_INITIALIZES_SYSTEM
     system_init();
+#endif
     uart_init();
     hal_flash_init();
 

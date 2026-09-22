@@ -11,17 +11,17 @@ machine_hal_sources = files(
   'hal/system.c',
   'hal/flash.c',
   'hal/retarget.c',
+  '../../vendor/msp432e4/msp432e401y_flash.c',
 )
 
 machine_hal_include = include_directories('hal')
 machine_config_include = include_directories('config')
-machine_vendor_include = include_directories(
-  '../../vendor/msp432e4',
-  '../../vendor/msp432e4/cmsis',
-)
+machine_vendor_include = include_directories('../../vendor/msp432e4')
+cmsis_dep = dependency('cmsis')
 
 machine_hal_dep = declare_dependency(
   sources: machine_hal_sources,
+  dependencies: cmsis_dep,
   include_directories: [machine_hal_include, machine_vendor_include],
 )
 

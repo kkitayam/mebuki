@@ -11,6 +11,13 @@ boot_sources = files(
   'main.c',
 ) + machine_boot_startup + public_keys
 
+boot_c_args = []
+if machine_name == 'rx65n'
+  boot_c_args += ['-DMEBUKI_BOOT_USE_BANK_SWAP=1']
+elif machine_name == 'msp432e4'
+  boot_c_args += ['-DMSP432E4_STARTUP_INITIALIZES_SYSTEM=1']
+endif
+
 boot_exe = executable(
   'boot',
   boot_sources,
@@ -24,7 +31,7 @@ boot_exe = executable(
     boot_library_dep,
     machine_hal_dep,
   ],
-  c_args: machine_name == 'rx65n' ? ['-DMEBUKI_BOOT_USE_BANK_SWAP=1'] : [],
+  c_args: boot_c_args,
   link_args: [
     '-T' + machine_boot_linker[0].full_path(),
     '-Wl,-Map=' + meson.current_build_dir() / 'boot.map',
