@@ -3,7 +3,7 @@ if not sign_algorithms.has_key(verification)
   error('Unsupported SVL: @0@'.format(verification))
 endif
 
-if machine_name != 'renode-cm4' and machine_name != 'rx261' and machine_name != 'rx65n'
+if machine_name != 'renode-cm4' and machine_name != 'rx261' and machine_name != 'rx65n' and machine_name != 'msp432e4'
   error('Unsupported machine for examples: @0@'.format(machine_name))
 endif
 
@@ -44,7 +44,7 @@ sign_algo = sign_algorithms[verification]
 
 subdir('boot')
 subdir('app')
-if machine_name == 'renode-cm4' or machine_name == 'rx261' or machine_name == 'rx65n'
+if machine_name == 'renode-cm4' or machine_name == 'rx261' or machine_name == 'rx65n' or machine_name == 'msp432e4'
   subdir('app_ota')
 endif
 
@@ -197,5 +197,94 @@ elif machine_name == 'rx65n'
     endif
   else
     message('rfp-cli not found. RX65N use case run targets will not be available.')
+  endif
+elif machine_name == 'msp432e4'
+  dslite = find_program('dslite', required: false)
+  python_exe = find_program('python3', 'python', required: true)
+  serial_port_option = get_option('serial_port')
+  if serial_port_option == ''
+    serial_port_option = 'COM5'
+  endif
+
+  if dslite.found()
+    ccxml = files('../machines/msp432e4/scripts/MSP432E401Y.ccxml')
+    run_script = files('../machines/msp432e4/scripts/run.py')
+    boot_bank1_srec = custom_target(
+      'boot_bank1_srec',
+      input: boot_exe,
+      output: 'boot_bank1.srec',
+      command: [
+        objcopy,
+        '-O', 'srec',
+        '--adjust-vma=0x00080000',
+        '@INPUT@',
+        '@OUTPUT@',
+      ],
+    )
+
+    foreach usecase : all_usecases
+      if usecase['name'] == 'slot0' or usecase['name'] == 'higher_version' or usecase['name'] == 'keygen_mix' or usecase['name'] == 'ota'
+        slot0_srec = custom_target(
+          usecase['name'] + '_slot0_srec',
+          input: usecase['slot0'],
+          output: usecase['name'] + '_slot0.srec',
+          command: [
+            objcopy,
+            '-I', 'binary',
+            '-O', 'srec',
+            '--adjust-vma=' + machine_slot0_address,
+            '@INPUT@',
+            '@OUTPUT@',
+          ],
+        )
+        firmware_command = [
+          '--firmware', boot_exe,
+          '--firmware', boot_bank1_srec,
+          '--firmware', slot0_srec,
+        ]
+        depends = usecase['depends'] + [boot_bank1_srec, slot0_srec]
+        if usecase['has_slot1']
+          slot1_srec = custom_target(
+            usecase['name'] + '_slot1_srec',
+            input: usecase['slot1'],
+            output: usecase['name'] + '_slot1.srec',
+            command: [
+              objcopy,
+              '-I', 'binary',
+              '-O', 'srec',
+              '--adjust-vma=' + machine_slot1_address,
+              '@INPUT@',
+              '@OUTPUT@',
+            ],
+          )
+          firmware_command += ['--firmware', slot1_srec]
+          depends += [slot1_srec]
+        endif
+        extra_args = []
+        if usecase['name'] == 'ota'
+          extra_args = [
+            '--ymodem-image', app_images[2][0],
+            '--expect', 'hello world',
+          ]
+        else
+          extra_args = ['--expect', 'hello world']
+        endif
+        run_target(
+          'run_' + usecase['name'],
+          command: [
+            python_exe,
+            run_script,
+            serial_port_option,
+            '--dslite', dslite,
+            '--ccxml', ccxml,
+          ] + firmware_command + [
+            '--log-file', meson.current_build_dir() / ('uart_' + usecase['name'] + '.log'),
+          ] + extra_args,
+          depends: depends,
+        )
+      endif
+    endforeach
+  else
+    warning('dslite not found. MSP432E4 use case run targets are unavailable.')
   endif
 endif

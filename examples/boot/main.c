@@ -12,7 +12,11 @@
 #include "taneue.h"
 
 #ifdef MEBUKI_BOOT_USE_BANK_SWAP
+#ifdef MEBUKI_BOOT_USE_MSP432E4_BANK_SWAP
+#include "msp432e401y_flash.h"
+#else
 #include "flash_type4.h"
+#endif
 #endif
 
 void uart_printf(const char* fmt, ...)
@@ -104,7 +108,9 @@ int main(void)
 {
     uint32_t cnt;
 
+#ifndef MSP432E4_STARTUP_INITIALIZES_SYSTEM
     system_init();
+#endif
     uart_init();
     hal_flash_init();
 
@@ -168,6 +174,7 @@ int main(void)
 
     uart_puts("  Entry Point: 0x");
     uint32_t entry = boot_info.entry_point;
+    uint32_t handoff_entry = entry;
     put_hex(entry, true);
     uart_puts("\r\n");
 
@@ -184,11 +191,19 @@ int main(void)
         /* The application software is built to run from slot0, so a swap is necessary when booting from slot1 */
         uart_puts("Scheduling slot swap...\r\n");
 #ifdef MEBUKI_BOOT_USE_BANK_SWAP
+#ifdef MEBUKI_BOOT_USE_MSP432E4_BANK_SWAP
+        int swap_result = msp432_flash_swap_bank();
+#else
         int swap_result = flash_type4_swap_bank();
+#endif
         if (swap_result != 0) {
             put_error_code("ERROR: Failed to swap flash bank (code: ", swap_result);
             halt();
         }
+#ifdef MEBUKI_BOOT_USE_MSP432E4_BANK_SWAP
+        uart_puts("Flash bank swapped\r\n");
+        handoff_entry = MBK_SLOT0_BASE + MBK_HEADER_SIZE;
+#endif
 #else
         enum taneue_result result = taneue_schedule_swap();
         if (result != TANEUE_SUCCESS) {
@@ -197,11 +212,13 @@ int main(void)
         }
 #endif
         uart_puts("Slot swap scheduled\r\n");
+#ifndef MEBUKI_BOOT_USE_MSP432E4_BANK_SWAP
         system_reset();  /* swap operation is deferred until the next boot */
+#endif
     }
 
     prepare_handoff();
-    jump_to_firmware(boot_info.entry_point);
+    jump_to_firmware(handoff_entry);
 
     /* unreachable */
     halt();

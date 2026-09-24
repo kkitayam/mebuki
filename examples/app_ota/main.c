@@ -40,7 +40,9 @@ static int erase_slot1(void)
 
 int main(void)
 {
+#ifndef MSP432E4_STARTUP_INITIALIZES_SYSTEM
     system_init();
+#endif
     uart_init();
     hal_flash_init();
 

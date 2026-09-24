@@ -11,6 +11,17 @@ boot_sources = files(
   'main.c',
 ) + machine_boot_startup + public_keys
 
+boot_c_args = []
+if machine_name == 'rx65n'
+  boot_c_args += ['-DMEBUKI_BOOT_USE_BANK_SWAP=1']
+elif machine_name == 'msp432e4'
+  boot_c_args += [
+    '-DMSP432E4_STARTUP_INITIALIZES_SYSTEM=1',
+    '-DMEBUKI_BOOT_USE_BANK_SWAP=1',
+    '-DMEBUKI_BOOT_USE_MSP432E4_BANK_SWAP=1',
+  ]
+endif
+
 boot_exe = executable(
   'boot',
   boot_sources,
@@ -24,7 +35,7 @@ boot_exe = executable(
     boot_library_dep,
     machine_hal_dep,
   ],
-  c_args: machine_name == 'rx65n' ? ['-DMEBUKI_BOOT_USE_BANK_SWAP=1'] : [],
+  c_args: boot_c_args,
   link_args: [
     '-T' + machine_boot_linker[0].full_path(),
     '-Wl,-Map=' + meson.current_build_dir() / 'boot.map',
@@ -153,6 +164,38 @@ elif machine_name == 'rx65n'
     endif
     run_target(run_name, command: run_args)
   endforeach
+elif machine_name == 'msp432e4'
+  dslite = find_program('dslite', required: false)
+  python_exe = find_program('python3', 'python', required: true)
+  serial_port_option = get_option('serial_port')
+  if serial_port_option == ''
+    serial_port_option = 'COM5'
+  endif
+
+  if dslite.found()
+    ccxml = files('../../machines/msp432e4/scripts/MSP432E401Y.ccxml')
+    run_script = files('../../machines/msp432e4/scripts/run.py')
+
+    run_target(
+      'deploy',
+      command: [dslite, '-c', ccxml, '-u', boot_exe],
+    )
+    run_target(
+      'run-capture',
+      command: [
+        python_exe,
+        run_script,
+        serial_port_option,
+        '--dslite', dslite,
+        '--ccxml', ccxml,
+        '--firmware', boot_exe,
+        '--log-file', meson.current_build_dir() / 'uart.log',
+        '--expect', 'No bootable slot found',
+      ],
+    )
+  else
+    warning('dslite not found. MSP432E4 deploy targets are unavailable.')
+  endif
 endif
 
 run_target(
