@@ -60,7 +60,7 @@ if machine_name == 'rx261'
   boot_srec = custom_target(
     'boot_srec',
     input: boot_exe,
-    output: boot_exe.name() + '.s32',
+    output: boot_exe.name() + '.srec',
     command: [objcopy, '-O', 'srec', '@INPUT@', '@OUTPUT@'],
     build_by_default: true,
   )
@@ -76,8 +76,8 @@ if machine_name == 'rx261'
       python_exe,
       run_script,
       serial_port_option,
-      '--build-dir', meson.current_build_dir(),
       '--rfp-cli', rfp_cli,
+      '--log-file', meson.current_build_dir() / 'uart.log',
       '--no-deploy',
       '--display',
     ],
@@ -89,8 +89,8 @@ if machine_name == 'rx261'
       python_exe,
       run_script,
       serial_port_option,
-      '--build-dir', meson.current_build_dir(),
       '--rfp-cli', rfp_cli,
+      '--log-file', meson.current_build_dir() / 'uart.log',
     ],
   )
 elif machine_name == 'rx65n'
@@ -98,10 +98,10 @@ elif machine_name == 'rx65n'
   python_exe = find_program('python3', 'python', required: true)
   serial_port_option = get_option('serial_port')
 
-  boot_srec = custom_target(
-    'boot_srec',
+  boot_bank1_srec = custom_target(
+    'boot_bank1_srec',
     input: boot_exe,
-    output: boot_exe.name() + '.s32',
+    output: 'boot_bank1.srec',
     command: [objcopy, '-O', 'srec', '@INPUT@', '@OUTPUT@'],
     build_by_default: true,
   )
@@ -109,17 +109,8 @@ elif machine_name == 'rx65n'
   boot_bank0_srec = custom_target(
     'boot_bank0_srec',
     input: boot_exe,
-    output: 'boot_bank0.s32',
+    output: 'boot_bank0.srec',
     command: [objcopy, '--change-addresses', '-0x100000', '-O', 'srec', '@INPUT@', '@OUTPUT@'],
-    build_by_default: true,
-  )
-
-  python_merge_srec = files('../../machines/rx65n/scripts/merge_srec.py')
-  boot_dualbank_srec = custom_target(
-    'boot_dualbank_srec',
-    input: [boot_srec, boot_bank0_srec],
-    output: 'boot_dualbank.s32',
-    command: [python_exe, python_merge_srec, '@INPUT@', '@OUTPUT@'],
     build_by_default: true,
   )
 
@@ -133,8 +124,8 @@ elif machine_name == 'rx65n'
       python_exe,
       run_script,
       serial_port_option,
-      '--build-dir', meson.current_build_dir(),
       '--rfp-cli', rfp_cli,
+      '--log-file', meson.current_build_dir() / 'uart.log',
       '--no-deploy',
     ]
     if run_name == 'run'

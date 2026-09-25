@@ -24,14 +24,12 @@ from ymodem_sender import ymodem_send
 
 def deploy_with_rfp(
     rfp_cli: str,
-    boot_image: str,
-    slot_images: list[tuple[str, str]],
+    firmware: list[str],
 ) -> bool:
-    """Deploy boot and application images using rfp-cli."""
+    """Deploy SREC firmware images using rfp-cli."""
     command = [rfp_cli, "-d", "RX200", "-t", "e2l", "-if", "fine", "-a"]
-    command += ["-file", boot_image]
-    for image, address in slot_images:
-        command += ["-bin", address, image]
+    for image in firmware:
+        command += ["-file", image]
 
     try:
         logging.getLogger(__name__).info("Deploying boot and application images")
@@ -63,7 +61,6 @@ class SerialYmodemTransport:
                 return data
             data = self.capture.read_uart(self.log_file)
             if data:
-                self.capture.captured_uart.extend(data)
                 self.buffer.extend(data)
             time.sleep(0.001)
         return b""
@@ -78,24 +75,32 @@ class SerialYmodemTransport:
 class SerialLogCapture:
     """Manages UART log capture and application execution."""
 
-    def __init__(self, serial_port: str, build_dir: str, duration: int = 5, display: bool = False):
+    def __init__(
+        self,
+        serial_port: str,
+        log_file: Path,
+        duration: int = 5,
+        display: bool = False,
+        expected: str | None = None,
+    ):
         """
         Initialize the serial log capture.
 
         Args:
             serial_port: Serial port name (e.g., COM3, /dev/ttyUSB0)
-            build_dir: Build directory path for log file output
+            log_file: Path for log file output
             duration: Log capture duration in seconds
             display: If True, also print logs to stdout
         """
         self.serial_port = serial_port
-        self.build_dir = Path(build_dir)
+        self.log_file = log_file
         self.duration = duration
-        self.log_file = self.build_dir / "uart.log"
+        self.expected = expected
         self.serial = None
         self.rfp_process = None
         self.display = display
         self.pending_uart = bytearray()
+        self.captured_uart = bytearray()
 
         logging.basicConfig(
             level=logging.INFO,
@@ -189,6 +194,9 @@ class SerialLogCapture:
                         time.sleep(0.01)
 
             self.logger.info(f"Log capture completed. Logs saved to: {self.log_file}")
+            if self.expected is not None and self.expected.encode() not in self.captured_uart:
+                self.logger.error("Expected UART text was not received: %s", self.expected)
+                return False
             return True
         except Exception as e:
             self.logger.error(f"Failed to capture logs: {e}")
@@ -201,6 +209,7 @@ class SerialLogCapture:
         data = self.serial.read(self.serial.in_waiting)
         log_file.write(data)
         log_file.flush()
+        self.captured_uart.extend(data)
         if self.display:
             sys.stdout.write(data.decode("utf-8", errors="replace"))
             sys.stdout.flush()
@@ -213,9 +222,7 @@ class SerialLogCapture:
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             previous_length = len(self.captured_uart)
-            data = self.read_uart(log_file)
-            if data:
-                self.captured_uart.extend(data)
+            self.read_uart(log_file)
             search_start = max(0, previous_length - len(marker) + 1)
             marker_start = self.captured_uart.find(marker, search_start)
             if marker_start >= 0:
@@ -263,8 +270,7 @@ class SerialLogCapture:
         rfp_args: list,
         ymodem_image: Optional[str] = None,
         no_deploy: bool = False,
-        boot_image: Optional[str] = None,
-        slot_images: Optional[list[tuple[str, str]]] = None,
+        firmware: Optional[list[str]] = None,
     ) -> int:
         """
         Execute the full log capture and application run sequence.
@@ -279,10 +285,10 @@ class SerialLogCapture:
         try:
             self.ymodem_image = ymodem_image
             if not no_deploy:
-                if boot_image is None or slot_images is None:
+                if not firmware:
                     self.logger.error("Deployment images are required unless --no-deploy is set")
                     return 1
-                if not deploy_with_rfp(rfp_cli, boot_image, slot_images):
+                if not deploy_with_rfp(rfp_cli, firmware):
                     return 1
             if not self.open_serial_port():
                 return 1
@@ -325,11 +331,11 @@ def main() -> int:
         "--ymodem-image",
         help="Signed image to send after the app_ota banner",
     )
-    parser.add_argument("--boot-image", help="Path to boot SREC image")
-    parser.add_argument("--slot0-image", help="Path to slot0 image")
-    parser.add_argument("--slot1-image", help="Path to slot1 image")
-    parser.add_argument("--slot0-address", default="0xFFF80000")
-    parser.add_argument("--slot1-address", default="0xFFFA0000")
+    parser.add_argument(
+        "--firmware",
+        action="append",
+        help="Path to an SREC firmware image; may be specified multiple times",
+    )
     parser.add_argument(
         "--no-deploy",
         "-n",
@@ -337,9 +343,10 @@ def main() -> int:
         help="Skip deployment and only run the application",
     )
     parser.add_argument(
-        "--build-dir",
+        "--log-file",
         required=True,
-        help="Build directory path"
+        type=Path,
+        help="Path for UART log output",
     )
     parser.add_argument(
         "--rfp-cli",
@@ -357,6 +364,10 @@ def main() -> int:
         action="store_true",
         help="Display UART logs to stdout in addition to saving to file"
     )
+    parser.add_argument(
+        "--expect",
+        help="Require this text in the captured UART output",
+    )
 
     args = parser.parse_args()
 
@@ -364,7 +375,13 @@ def main() -> int:
         print("Error: serial_port option is required", file=sys.stderr)
         return 1
 
-    capture = SerialLogCapture(args.serial_port, args.build_dir, args.duration, args.display)
+    capture = SerialLogCapture(
+        args.serial_port,
+        args.log_file,
+        args.duration,
+        args.display,
+        args.expect,
+    )
 
     rfp_args = [
         "-d", "RX200",
@@ -373,18 +390,12 @@ def main() -> int:
         "-run"
     ]
 
-    slot_images = []
-    if args.slot0_image:
-        slot_images.append((args.slot0_image, args.slot0_address))
-    if args.slot1_image:
-        slot_images.append((args.slot1_image, args.slot1_address))
     return capture.run(
         args.rfp_cli,
         rfp_args,
         args.ymodem_image,
         args.no_deploy,
-        args.boot_image,
-        slot_images,
+        args.firmware,
     )
 
 

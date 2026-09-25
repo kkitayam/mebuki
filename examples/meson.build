@@ -107,25 +107,50 @@ elif machine_name == 'rx261'
       run_script = meson.project_source_root() / 'machines' / 'rx261' / 'scripts' / 'run.py'
 
       foreach usecase : all_usecases
+        firmware_command = ['--firmware', boot_srec]
+        depends = usecase['depends']
+        if usecase['has_slot0']
+          slot0_srec = custom_target(
+            usecase['name'] + '_slot0_srec',
+            input: usecase['slot0'],
+            output: usecase['name'] + '_slot0.srec',
+            command: [
+              objcopy,
+              '-I', 'binary',
+              '-O', 'srec',
+              '--adjust-vma=' + machine_slot0_address,
+              '@INPUT@',
+              '@OUTPUT@',
+            ],
+          )
+          firmware_command += ['--firmware', slot0_srec]
+          depends += [slot0_srec]
+        endif
+        if usecase['has_slot1']
+          slot1_srec = custom_target(
+            usecase['name'] + '_slot1_srec',
+            input: usecase['slot1'],
+            output: usecase['name'] + '_slot1.srec',
+            command: [
+              objcopy,
+              '-I', 'binary',
+              '-O', 'srec',
+              '--adjust-vma=' + machine_slot1_address,
+              '@INPUT@',
+              '@OUTPUT@',
+            ],
+          )
+          firmware_command += ['--firmware', slot1_srec]
+          depends += [slot1_srec]
+        endif
         cmd = [
           python_exe,
           run_script,
           serial_port_option,
-          '--boot-image', boot_srec.full_path(),
-          '--build-dir', meson.current_build_dir(),
           '--rfp-cli', rfp_cli,
+          '--log-file', meson.current_build_dir() / ('uart_' + usecase['name'] + '.log'),
           '--display',
-        ]
-
-        if usecase['has_slot0']
-          cmd += ['--slot0-image', usecase['slot0'].full_path()]
-          cmd += ['--slot0-address', machine_slot0_address]
-        endif
-
-        if usecase['has_slot1']
-          cmd += ['--slot1-image', usecase['slot1'].full_path()]
-          cmd += ['--slot1-address', machine_slot1_address]
-        endif
+        ] + firmware_command
         if usecase['name'] == 'ota'
           cmd += [
             '--ymodem-image', app_images[2][0].full_path(),
@@ -136,7 +161,7 @@ elif machine_name == 'rx261'
         run_target(
           'run_' + usecase['name'],
           command: cmd,
-          depends: usecase['depends'],
+          depends: depends,
         )
       endforeach
     endif
@@ -156,25 +181,50 @@ elif machine_name == 'rx65n'
       run_script = meson.project_source_root() / 'machines' / 'rx65n' / 'scripts' / 'run.py'
 
       foreach usecase : all_usecases
+        firmware_command = ['--firmware', boot_bank1_srec, '--firmware', boot_bank0_srec]
+        depends = usecase['depends']
+        if usecase['has_slot0']
+          slot0_srec = custom_target(
+            usecase['name'] + '_slot0_srec',
+            input: usecase['slot0'],
+            output: usecase['name'] + '_slot0.srec',
+            command: [
+              objcopy,
+              '-I', 'binary',
+              '-O', 'srec',
+              '--adjust-vma=' + machine_slot0_address,
+              '@INPUT@',
+              '@OUTPUT@',
+            ],
+          )
+          firmware_command += ['--firmware', slot0_srec]
+          depends += [slot0_srec]
+        endif
+        if usecase['has_slot1']
+          slot1_srec = custom_target(
+            usecase['name'] + '_slot1_srec',
+            input: usecase['slot1'],
+            output: usecase['name'] + '_slot1.srec',
+            command: [
+              objcopy,
+              '-I', 'binary',
+              '-O', 'srec',
+              '--adjust-vma=' + machine_slot1_address,
+              '@INPUT@',
+              '@OUTPUT@',
+            ],
+          )
+          firmware_command += ['--firmware', slot1_srec]
+          depends += [slot1_srec]
+        endif
         cmd = [
           python_exe,
           run_script,
           serial_port_option,
-          '--boot-image', boot_dualbank_srec.full_path(),
-          '--build-dir', meson.current_build_dir(),
           '--rfp-cli', rfp_cli,
+          '--log-file', meson.current_build_dir() / ('uart_' + usecase['name'] + '.log'),
           '--display',
-        ]
-
-        if usecase['has_slot0']
-          cmd += ['--slot0-image', usecase['slot0'].full_path()]
-          cmd += ['--slot0-address', machine_slot0_address]
-        endif
-
-        if usecase['has_slot1']
-          cmd += ['--slot1-image', usecase['slot1'].full_path()]
-          cmd += ['--slot1-address', machine_slot1_address]
-        endif
+        ] + firmware_command
         if usecase['name'] == 'ota'
           cmd += [
             '--ymodem-image', app_images[2][0].full_path(),
@@ -185,7 +235,7 @@ elif machine_name == 'rx65n'
         run_target(
           'run_' + usecase['name'],
           command: cmd,
-          depends: usecase['depends'],
+          depends: depends,
         )
       endforeach
     endif
