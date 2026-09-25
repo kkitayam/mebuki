@@ -7,6 +7,7 @@ This directory contains the implementations of execution environments (Machines)
 - `renode-cm4`: Reference environment running on Renode for Cortex-M4
 - `rx261`: RX261 real board environment
 - `rx65n`: RX65N real board environment
+- `msp432e4`: MSP432E401Y real board environment
 
 ## Responsibilities of the Machine
 
@@ -22,3 +23,9 @@ bank swapping for its two 1 MiB code-flash banks; boot software is deployed
 to both banks.
 
 Use Case is defined on the `examples/usecases/` side and is not retained on the Machine side.
+
+Each machine provides `scripts/run.py` as its execution entry point. By
+default it deploys the requested image and then captures UART output. RX261,
+RX65N, and MSP432E4 support `--no-deploy` (or `-n`) to start firmware that is
+already programmed. Renode always loads its images when it starts and does
+not support `--no-deploy`.

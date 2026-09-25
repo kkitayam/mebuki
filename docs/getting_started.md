@@ -131,6 +131,10 @@ Example:
 uv run meson compile -C builddir run_higher_version
 ```
 
+To restart the bootloader without deploying an image, run the `run` target.
+The target uses the image already stored on the machine and captures UART
+output. The former `deploy` target is no longer provided.
+
 ## RX261 Use Cases
 
 RX261 hardware support is available for all use cases.
@@ -163,6 +167,9 @@ This command:
 
 The UART console displays output similar to the Renode examples above.
 
+The runner deploys images by default. Use `-n` or `--no-deploy` with the
+machine `run.py` script when the images are already programmed.
+
 ## RX65N Use Cases
 
 RX65N supports `run_slot0`, `run_higher_version`, `run_keygen_mix`, and
@@ -187,6 +194,16 @@ selected signed application images at the slot0 and slot1 bank addresses.
 `run_higher_version` verifies bank swap after selecting the higher security
 version, and `run_keygen_mix` verifies images signed with different key
 generations. OTA remains unsupported for RX65N.
+
+## MSP432E4 Use Cases
+
+MSP432E4 supports the use-case targets with the TI `dslite` tool and the
+configured `MSP432E401Y.ccxml` file. Configure the build with the serial port
+used for UART output (the default is `COM5`), then run a target such as
+`run_slot0`. The target deploys the firmware, starts it, and captures UART.
+
+The boot-only `run` target skips deployment and captures UART from the
+firmware already programmed on the board.
 
 ## Run the Unit Tests
 

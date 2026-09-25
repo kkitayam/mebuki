@@ -48,6 +48,7 @@ class SerialLogCapture:
         log_file: Path | None,
         expected: str | None,
         ymodem_image: Path | None,
+        no_deploy: bool,
     ) -> None:
         self.serial_port = serial_port
         self.dslite = dslite
@@ -57,6 +58,7 @@ class SerialLogCapture:
         self.log_file = log_file
         self.expected = expected
         self.ymodem_image = ymodem_image
+        self.no_deploy = no_deploy
         self.ota_ready = False
         self.captured = bytearray()
         self.serial_port_handle: serial.Serial | None = None
@@ -155,7 +157,7 @@ class SerialLogCapture:
         self.capture_available(log_file)
 
     def run(self) -> int:
-        """Open UART, deploy firmware, and optionally write a UART log."""
+        """Open UART, optionally deploy firmware, and write a UART log."""
         try:
             self.open_serial_port()
         except serial.SerialException as error:
@@ -166,13 +168,23 @@ class SerialLogCapture:
 
         try:
             if self.log_file is None:
-                return self.deploy(None)
+                if not self.no_deploy:
+                    deploy_status = self.deploy(None)
+                    if deploy_status != 0:
+                        return deploy_status
+                self.capture_for_duration(None)
+                return 0
 
             self.log_file.parent.mkdir(parents=True, exist_ok=True)
             with self.log_file.open("wb") as file:
-                deploy_status = self.deploy(file)
-                if deploy_status != 0:
-                    return deploy_status
+                if self.no_deploy:
+                    self.logger.warning(
+                        "Deployment skipped; dslite reset is unavailable, capturing UART only"
+                    )
+                else:
+                    deploy_status = self.deploy(file)
+                    if deploy_status != 0:
+                        return deploy_status
 
                 self.capture_for_duration(file)
                 if self.expected is not None and self.expected.encode() not in self.captured:
@@ -232,6 +244,12 @@ def main() -> int:
         type=Path,
         help="Signed image to send after the OTA receiver starts",
     )
+    parser.add_argument(
+        "--no-deploy",
+        "-n",
+        action="store_true",
+        help="Skip deployment and only capture UART output",
+    )
     args = parser.parse_args()
 
     if args.duration < 0:
@@ -249,6 +267,7 @@ def main() -> int:
         args.log_file,
         args.expect,
         args.ymodem_image,
+        args.no_deploy,
     )
     return capture.run()
 

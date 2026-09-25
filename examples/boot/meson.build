@@ -65,18 +65,6 @@ if machine_name == 'rx261'
     build_by_default: true,
   )
 
-  run_target(
-    'deploy',
-    command: [
-      rfp_cli,
-      '-d', 'RX200',
-      '-t', 'e2l',
-      '-if', 'fine',
-      '-a',
-      boot_srec,
-    ],
-  )
-
   if serial_port_option == ''
     error('serial_port option must be specified for RX261 run target. Use -Dserial_port=<port>')
   endif
@@ -90,6 +78,7 @@ if machine_name == 'rx261'
       serial_port_option,
       '--build-dir', meson.current_build_dir(),
       '--rfp-cli', rfp_cli,
+      '--no-deploy',
       '--display',
     ],
   )
@@ -134,18 +123,6 @@ elif machine_name == 'rx65n'
     build_by_default: true,
   )
 
-  rfp_args = [
-    '-d', 'RX65x',
-    '-t', 'e2l',
-    '-if', 'fine',
-    '-auth', 'id', 'FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF',
-  ]
-
-  run_target(
-    'deploy',
-    command: [rfp_cli] + rfp_args + ['-a', boot_dualbank_srec],
-  )
-
   if serial_port_option == ''
     error('serial_port option must be specified for RX65N run target. Use -Dserial_port=<port>')
   endif
@@ -158,6 +135,7 @@ elif machine_name == 'rx65n'
       serial_port_option,
       '--build-dir', meson.current_build_dir(),
       '--rfp-cli', rfp_cli,
+      '--no-deploy',
     ]
     if run_name == 'run'
       run_args += ['--display']
@@ -177,8 +155,17 @@ elif machine_name == 'msp432e4'
     run_script = files('../../machines/msp432e4/scripts/run.py')
 
     run_target(
-      'deploy',
-      command: [dslite, '-c', ccxml, '-u', boot_exe],
+      'run',
+      command: [
+        python_exe,
+        run_script,
+        serial_port_option,
+        '--dslite', dslite,
+        '--ccxml', ccxml,
+        '--firmware', boot_exe,
+        '--log-file', meson.current_build_dir() / 'uart.log',
+        '--no-deploy',
+      ],
     )
     run_target(
       'run-capture',
@@ -190,7 +177,7 @@ elif machine_name == 'msp432e4'
         '--ccxml', ccxml,
         '--firmware', boot_exe,
         '--log-file', meson.current_build_dir() / 'uart.log',
-        '--expect', 'No bootable slot found',
+        '--no-deploy',
       ],
     )
   else

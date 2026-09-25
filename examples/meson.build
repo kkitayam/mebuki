@@ -53,7 +53,7 @@ subdir('usecases')
 if machine_name == 'renode-cm4'
   python_exe = find_program('python3', 'python', required: true)
   renode = find_program('renode', required: false)
-  usecase_run_script = meson.project_source_root() / 'machines' / 'renode-cm4' / 'scripts' / 'usecase_run.py'
+  run_script = meson.project_source_root() / 'machines' / 'renode-cm4' / 'scripts' / 'run.py'
 
   if not renode.found()
     warning('renode not found. Renode use case run targets will look for it at runtime.')
@@ -62,7 +62,7 @@ if machine_name == 'renode-cm4'
   foreach usecase : all_usecases
     cmd = [
       python_exe,
-      usecase_run_script,
+      run_script,
       '--boot-image', boot_exe.full_path(),
       '--build-dir', meson.current_build_dir(),
       '--display',
@@ -104,19 +104,16 @@ elif machine_name == 'rx261'
     if serial_port_option == ''
       warning('serial_port option not specified. RX261 use case run targets will not be functional.')
     else
-      usecase_run_script = meson.project_source_root() / 'machines' / 'rx261' / 'scripts' / 'usecase_run.py'
       run_script = meson.project_source_root() / 'machines' / 'rx261' / 'scripts' / 'run.py'
 
       foreach usecase : all_usecases
         cmd = [
           python_exe,
-          usecase_run_script,
+          run_script,
           serial_port_option,
           '--boot-image', boot_srec.full_path(),
           '--build-dir', meson.current_build_dir(),
           '--rfp-cli', rfp_cli,
-          '--python-exe', python_exe,
-          '--run-script', run_script,
           '--display',
         ]
 
@@ -156,19 +153,16 @@ elif machine_name == 'rx65n'
     if serial_port_option == ''
       warning('serial_port option not specified. RX65N use case run targets will not be functional.')
     else
-      usecase_run_script = meson.project_source_root() / 'machines' / 'rx65n' / 'scripts' / 'usecase_run.py'
       run_script = meson.project_source_root() / 'machines' / 'rx65n' / 'scripts' / 'run.py'
 
       foreach usecase : all_usecases
         cmd = [
           python_exe,
-          usecase_run_script,
+          run_script,
           serial_port_option,
           '--boot-image', boot_dualbank_srec.full_path(),
           '--build-dir', meson.current_build_dir(),
           '--rfp-cli', rfp_cli,
-          '--python-exe', python_exe,
-          '--run-script', run_script,
           '--display',
         ]
 

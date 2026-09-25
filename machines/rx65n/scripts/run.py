@@ -22,6 +22,28 @@ import serial
 from ymodem_sender import ymodem_send
 
 
+def deploy(
+    rfp_cli: str,
+    boot_image: str,
+    images: list[tuple[str, str]],
+) -> bool:
+    """Deploy boot and application images using rfp-cli."""
+    command = [
+        rfp_cli, "-d", "RX65x", "-t", "e2l", "-if", "fine",
+        "-auth", "id", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", "-a",
+        "-file", boot_image,
+    ]
+    for image, address in images:
+        command += ["-bin", address, image]
+    try:
+        logging.getLogger(__name__).info("Deploying boot and application images")
+        subprocess.run(command, check=True, capture_output=True, text=True)
+    except (OSError, subprocess.CalledProcessError) as error:
+        logging.getLogger(__name__).error("Deployment failed: %s", error)
+        return False
+    return True
+
+
 class SerialYmodemTransport:
     """Adapt the UART capture to the YMODEM sender interface."""
 
@@ -236,7 +258,15 @@ class SerialLogCapture:
             except Exception as e:
                 self.logger.error(f"Error terminating application: {e}")
 
-    def run(self, rfp_cli: str, rfp_args: list, ymodem_image: Optional[str] = None) -> int:
+    def run(
+        self,
+        rfp_cli: str,
+        rfp_args: list,
+        ymodem_image: Optional[str] = None,
+        no_deploy: bool = False,
+        boot_image: Optional[str] = None,
+        slot_images: Optional[list[tuple[str, str]]] = None,
+    ) -> int:
         """
         Execute the full log capture and application run sequence.
 
@@ -249,6 +279,12 @@ class SerialLogCapture:
         """
         try:
             self.ymodem_image = ymodem_image
+            if not no_deploy:
+                if boot_image is None or slot_images is None:
+                    self.logger.error("Deployment images are required unless --no-deploy is set")
+                    return 1
+                if not deploy(rfp_cli, boot_image, slot_images):
+                    return 1
             if not self.open_serial_port():
                 return 1
 
@@ -311,6 +347,17 @@ def main() -> int:
         "--ymodem-image",
         help="Signed image to send after the app_ota banner"
     )
+    parser.add_argument("--boot-image", help="Path to boot SREC image")
+    parser.add_argument("--slot0-image", help="Path to slot0 image")
+    parser.add_argument("--slot1-image", help="Path to slot1 image")
+    parser.add_argument("--slot0-address", default="0xFFE00000")
+    parser.add_argument("--slot1-address", default="0xFFF00000")
+    parser.add_argument(
+        "--no-deploy",
+        "-n",
+        action="store_true",
+        help="Skip deployment and only run the application",
+    )
 
     args = parser.parse_args()
 
@@ -328,7 +375,19 @@ def main() -> int:
         "-run"
     ]
 
-    return capture.run(args.rfp_cli, rfp_args, args.ymodem_image)
+    slot_images = []
+    if args.slot0_image:
+        slot_images.append((args.slot0_image, args.slot0_address))
+    if args.slot1_image:
+        slot_images.append((args.slot1_image, args.slot1_address))
+    return capture.run(
+        args.rfp_cli,
+        rfp_args,
+        args.ymodem_image,
+        args.no_deploy,
+        args.boot_image,
+        slot_images,
+    )
 
 
 if __name__ == "__main__":

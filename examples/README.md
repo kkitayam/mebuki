@@ -34,6 +34,12 @@ Deploy and run logic lives in machine definitions.
 - **renode-cm4**: All use cases supported. Run targets start the Renode simulator.
 - **rx261** and **rx65n**: All use cases supported. Run targets deploy images
   via rfp-cli and run them on hardware through the configured serial port.
+- **msp432e4**: Use cases supported through dslite and the configured serial
+  port.
+
+Every machine uses `machines/<machine>/scripts/run.py`. A use-case `run_*`
+target deploys images before starting the application. The boot `run` target
+uses `--no-deploy` and starts firmware that is already programmed.
 
 ## Build
 
@@ -85,6 +91,14 @@ the hardware bank-swap feature before booting the updated application.
 
 ```powershell
 uv run meson compile -C builddir run_ota
+```
+
+For MSP432E4, configure with the Arm cross file and the board serial port:
+
+```powershell
+uv run meson setup builddir-msp432e4 --cross-file cross/arm-none-eabi-gcc.ini `
+    -Dtarget=msp432e4 -Dserial_port=COM5
+uv run meson compile -C builddir-msp432e4 run_slot0
 ```
 
 The RX261 receiver programs code flash in 8-byte units. RX65N programs in
