@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Deploy an MSP432E401Y image with dslite and observe its UART output."""
+"""Deploy or reset an MSP432E401Y image with dslite and observe UART output."""
 
 import argparse
 import logging
@@ -36,7 +36,7 @@ class SerialTransport:
 
 
 class SerialLogCapture:
-    """Deploy an image and collect UART output."""
+    """Deploy or reset the target and collect UART output."""
 
     def __init__(
         self,
@@ -133,6 +133,35 @@ class SerialLogCapture:
 
         return 0
 
+    def reset(self) -> int:
+        """Issue a system reset without programming firmware."""
+        command = [self.dslite, "-c", self.ccxml, "-r", "1"]
+        self.logger.info("Resetting target with dslite: %s", " ".join(command))
+        try:
+            result = subprocess.run(
+                command,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except OSError as error:
+            self.logger.error("Failed to start dslite reset: %s", error)
+            return 1
+        except subprocess.CalledProcessError as error:
+            detail = (error.stderr or error.stdout or "").strip()
+            if detail:
+                self.logger.error("dslite reset failed: %s", detail)
+            else:
+                self.logger.error(
+                    "dslite reset exited with return code: %d",
+                    error.returncode,
+                )
+            return error.returncode or 1
+
+        if result.stdout.strip():
+            self.logger.debug("dslite reset output: %s", result.stdout.strip())
+        return 0
+
     def send_ymodem(self) -> bool:
         """Send the configured OTA image after the receiver banner."""
         if self.ymodem_image is None or self.serial_port_handle is None:
@@ -168,7 +197,11 @@ class SerialLogCapture:
 
         try:
             if self.log_file is None:
-                if not self.no_deploy:
+                if self.no_deploy:
+                    reset_status = self.reset()
+                    if reset_status != 0:
+                        return reset_status
+                else:
                     deploy_status = self.deploy(None)
                     if deploy_status != 0:
                         return deploy_status
@@ -178,9 +211,9 @@ class SerialLogCapture:
             self.log_file.parent.mkdir(parents=True, exist_ok=True)
             with self.log_file.open("wb") as file:
                 if self.no_deploy:
-                    self.logger.warning(
-                        "Deployment skipped; dslite reset is unavailable, capturing UART only"
-                    )
+                    reset_status = self.reset()
+                    if reset_status != 0:
+                        return reset_status
                 else:
                     deploy_status = self.deploy(file)
                     if deploy_status != 0:
@@ -200,7 +233,7 @@ class SerialLogCapture:
 
 
 def main() -> int:
-    """Parse command-line arguments and deploy firmware."""
+    """Parse command-line arguments and run or reset firmware."""
     parser = argparse.ArgumentParser(
         description="Deploy MSP432E401Y firmware with dslite and observe UART output"
     )
@@ -248,7 +281,7 @@ def main() -> int:
         "--no-deploy",
         "-n",
         action="store_true",
-        help="Skip deployment and only capture UART output",
+        help="Skip deployment, issue a system reset, and capture UART output",
     )
     args = parser.parse_args()
 

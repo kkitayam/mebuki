@@ -25,7 +25,8 @@ to both banks.
 Use Case is defined on the `examples/usecases/` side and is not retained on the Machine side.
 
 Each machine provides `scripts/run.py` as its execution entry point. By
-default it deploys the requested image and then captures UART output. RX261,
-RX65N, and MSP432E4 support `--no-deploy` (or `-n`) to start firmware that is
-already programmed. Renode always loads its images when it starts and does
-not support `--no-deploy`.
+default it deploys the requested image and then captures UART output. RX261
+and RX65N support `--no-deploy` (or `-n`) to start firmware that is already
+programmed. MSP432E4 uses the same option and issues a dslite system reset
+(`-r 1`) before capturing UART. Renode always loads its images when it starts
+and does not support `--no-deploy`.

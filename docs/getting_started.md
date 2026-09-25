@@ -202,8 +202,8 @@ configured `MSP432E401Y.ccxml` file. Configure the build with the serial port
 used for UART output (the default is `COM5`), then run a target such as
 `run_slot0`. The target deploys the firmware, starts it, and captures UART.
 
-The boot-only `run` target skips deployment and captures UART from the
-firmware already programmed on the board.
+The boot-only `run` target skips deployment, issues a dslite system reset
+(`-r 1`), and captures UART from the firmware already programmed on the board.
 
 ## Run the Unit Tests
 

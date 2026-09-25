@@ -39,7 +39,8 @@ Deploy and run logic lives in machine definitions.
 
 Every machine uses `machines/<machine>/scripts/run.py`. A use-case `run_*`
 target deploys images before starting the application. The boot `run` target
-uses `--no-deploy` and starts firmware that is already programmed.
+uses `--no-deploy`; on MSP432E4 this issues a dslite system reset (`-r 1`)
+before capturing UART from the firmware that is already programmed.
 
 ## Build
 
