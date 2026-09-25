@@ -86,12 +86,8 @@ def require_file(path: Path, description: str) -> Path:
 def generate_resc(
     resc_path_out: Path,
     repl: Path,
-    boot_image: Path,
+    firmware: list[Path],
     socket_port: int,
-    slot0_image: Optional[Path] = None,
-    slot0_address: Optional[str] = None,
-    slot1_image: Optional[Path] = None,
-    slot1_address: Optional[str] = None,
 ) -> None:
     """Write a temporary Renode script. Do not start the CPU."""
     lines = [
@@ -99,17 +95,8 @@ def generate_resc(
         "mach create",
         f"machine LoadPlatformDescription {resc_path(repl)}",
         "cpu FpuEnabled true",
-        f"sysbus LoadELF {resc_path(boot_image)}",
+        *[f"sysbus LoadSRecord {resc_path(image)}" for image in firmware],
     ]
-
-    if slot0_image is not None:
-        lines.append(
-            f"sysbus LoadBinary {resc_path(slot0_image)} {slot0_address}"
-        )
-    if slot1_image is not None:
-        lines.append(
-            f"sysbus LoadBinary {resc_path(slot1_image)} {slot1_address}"
-        )
 
     lines.extend(
         [
@@ -156,6 +143,7 @@ class UartReader:
         self._stop = threading.Event()
         self._error: Optional[BaseException] = None
         self._received = bytearray()
+        self._captured = bytearray()
         self._received_condition = threading.Condition()
         self._thread = threading.Thread(target=self._run, name="uart-reader", daemon=True)
 
@@ -204,6 +192,10 @@ class UartReader:
         """True if the reader stopped due to an error."""
         return self._error is not None
 
+    def contains(self, text: str) -> bool:
+        """Return whether the captured UART output contains text."""
+        return text.encode() in self._captured
+
     @property
     def error(self) -> Optional[BaseException]:
         """Reader exception, if any."""
@@ -232,6 +224,7 @@ class UartReader:
                 self._log_file.flush()
                 with self._received_condition:
                     self._received.extend(data)
+                    self._captured.extend(data)
                     self._received_condition.notify_all()
 
                 if self._display:
@@ -304,15 +297,16 @@ def run_renode(
     renode: Path,
     resc_file: Path,
     socket_port: int,
-    build_dir: Path,
+    log_file_path: Path,
     duration_s: int,
     display: bool,
     ymodem_image: Optional[Path] = None,
+    expected: Optional[str] = None,
 ) -> int:
     """Start Renode, capture UART, then stop and clean up."""
-    uart_log_path = build_dir / "uart.log"
-    renode_log_path = build_dir / "renode.log"
-    build_dir.mkdir(parents=True, exist_ok=True)
+    uart_log_path = log_file_path
+    renode_log_path = log_file_path.with_name(log_file_path.stem + "_renode.log")
+    log_file_path.parent.mkdir(parents=True, exist_ok=True)
 
     proc: Optional[subprocess.Popen[bytes]] = None
     uart_sock: Optional[socket.socket] = None
@@ -403,6 +397,9 @@ def run_renode(
         if reader.failed:
             logger.error("UART reader failed: %s", reader.error)
             return 1
+        if expected is not None and not reader.contains(expected):
+            logger.error("Expected UART text was not received: %s", expected)
+            return 1
         return 0
 
     except Exception as exc:
@@ -439,38 +436,24 @@ def run_renode(
 def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
-        description="Run a Renode Cortex-M4F use case with image loading"
+        description="Run a Renode Cortex-M4F use case with SREC firmware"
     )
     parser.add_argument(
         "--socket-port",
         type=int,
         help="TCP port for the UART socket (default: an available localhost port)",
     )
-    parser.add_argument("--boot-image", required=True, help="Path to boot ELF image")
-    parser.add_argument("--slot0-image", help="Path to slot0 image (optional)")
-    parser.add_argument("--slot1-image", help="Path to slot1 image (optional)")
+    parser.add_argument(
+        "--firmware",
+        action="append",
+        help="Path to an SREC firmware image; may be specified multiple times",
+    )
     parser.add_argument(
         "--ymodem-image",
         help="Signed image to send after the app_ota UART banner is observed",
     )
-    parser.add_argument(
-        "--slot0-address",
-        help="Slot0 load address (provided by Meson)",
-    )
-    parser.add_argument(
-        "--slot1-address",
-        help="Slot1 load address (provided by Meson)",
-    )
-    parser.add_argument("--build-dir", required=True, help="Build directory path")
+    parser.add_argument("--log-file", required=True, type=Path, help="Path for UART log output"    )
     parser.add_argument("--renode", help="Path to the Renode executable")
-    parser.add_argument(
-        "--python-exe",
-        help="Path to python executable (unused; accepted for CLI compatibility)",
-    )
-    parser.add_argument(
-        "--run-script",
-        help="Path to an extra run script (unused; accepted for CLI compatibility)",
-    )
     parser.add_argument(
         "--display",
         action="store_true",
@@ -482,6 +465,7 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         default=DEFAULT_DURATION_S,
         help=f"Run duration in seconds (default: {DEFAULT_DURATION_S})",
     )
+    parser.add_argument("--expect", help="Require this text in the captured UART output")
     parser.add_argument(
         "--repl",
         default=str(DEFAULT_REPL),
@@ -502,27 +486,17 @@ def main(argv: Optional[list[str]] = None) -> int:
             logger.error("Duration must be non-negative")
             return 1
 
-        if args.slot0_image and not args.slot0_address:
-            logger.error("--slot0-address is required when --slot0-image is set")
-            return 1
-        if args.slot1_image and not args.slot1_address:
-            logger.error("--slot1-address is required when --slot1-image is set")
+        if not args.firmware:
+            logger.error("At least one --firmware image is required")
             return 1
 
         try:
             renode = resolve_renode(args.renode)
             repl = require_file(Path(args.repl), "REPL")
-            boot_image = require_file(Path(args.boot_image), "Boot image")
-            slot0_image = (
-                require_file(Path(args.slot0_image), "Slot 0 image")
-                if args.slot0_image
-                else None
-            )
-            slot1_image = (
-                require_file(Path(args.slot1_image), "Slot 1 image")
-                if args.slot1_image
-                else None
-            )
+            firmware = [
+                require_file(Path(image), "Firmware image")
+                for image in args.firmware
+            ]
             ymodem_image = (
                 require_file(Path(args.ymodem_image), "YMODEM image")
                 if args.ymodem_image
@@ -544,22 +518,20 @@ def main(argv: Optional[list[str]] = None) -> int:
 
         logger.info("UART socket port: %s", socket_port)
 
-        build_dir = Path(args.build_dir)
-        build_dir.mkdir(parents=True, exist_ok=True)
-
         try:
-            fd, resc_name = tempfile.mkstemp(prefix="usecase_", suffix=".resc", dir=build_dir)
+            args.log_file.parent.mkdir(parents=True, exist_ok=True)
+            fd, resc_name = tempfile.mkstemp(
+                prefix="usecase_",
+                suffix=".resc",
+                dir=args.log_file.parent,
+            )
             os.close(fd)
             resc_file = Path(resc_name)
             generate_resc(
                 resc_file,
                 repl,
-                boot_image,
+                firmware,
                 socket_port,
-                slot0_image=slot0_image,
-                slot0_address=args.slot0_address,
-                slot1_image=slot1_image,
-                slot1_address=args.slot1_address,
             )
         except RuntimeError as exc:
             logger.error("%s", exc)
@@ -569,10 +541,11 @@ def main(argv: Optional[list[str]] = None) -> int:
             renode,
             resc_file,
             socket_port,
-            build_dir,
+            args.log_file,
             args.duration,
             args.display,
             ymodem_image=ymodem_image,
+            expected=args.expect,
         )
 
     finally:

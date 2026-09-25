@@ -254,7 +254,6 @@ def main() -> int:
     parser.add_argument(
         "--firmware",
         action="append",
-        required=True,
         help="Path to a firmware file; may be specified multiple times",
     )
     parser.add_argument(
@@ -287,6 +286,8 @@ def main() -> int:
 
     if args.duration < 0:
         parser.error("--duration must not be negative")
+    if not args.no_deploy and not args.firmware:
+        parser.error("at least one --firmware is required unless --no-deploy is set")
 
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(errors="replace")

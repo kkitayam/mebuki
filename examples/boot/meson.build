@@ -52,8 +52,17 @@ boot_bin = custom_target(
   build_by_default: false,
 )
 
-if machine_name == 'rx261'
-  rfp_cli = find_program('rfp-cli')
+if machine_name == 'renode-cm4'
+  boot_srec = custom_target(
+    'boot_srec',
+    input: boot_exe,
+    output: boot_exe.name() + '.srec',
+    command: [objcopy, '-O', 'srec', '@INPUT@', '@OUTPUT@'],
+    build_by_default: true,
+  )
+  machine_boot_firmwares = [boot_srec]
+elif machine_name == 'rx261'
+  rfp_cli = find_program('rfp-cli', required: false)
   python_exe = find_program('python3', 'python', required: true)
   serial_port_option = get_option('serial_port')
 
@@ -65,36 +74,36 @@ if machine_name == 'rx261'
     build_by_default: true,
   )
 
-  if serial_port_option == ''
-    error('serial_port option must be specified for RX261 run target. Use -Dserial_port=<port>')
+  machine_boot_firmwares = [boot_srec]
+
+  if rfp_cli.found() and serial_port_option != ''
+    run_script = meson.project_source_root() / 'machines' / 'rx261' / 'scripts' / 'run.py'
+    run_target(
+      'run',
+      command: [
+        python_exe,
+        run_script,
+        serial_port_option,
+        '--rfp-cli', rfp_cli,
+        '--log-file', meson.current_build_dir() / 'uart.log',
+        '--no-deploy',
+        '--display',
+      ],
+    )
+
+    run_target(
+      'run-capture',
+      command: [
+        python_exe,
+        run_script,
+        serial_port_option,
+        '--rfp-cli', rfp_cli,
+        '--log-file', meson.current_build_dir() / 'uart.log',
+      ],
+    )
   endif
-
-  run_script = meson.project_source_root() / 'machines' / 'rx261' / 'scripts' / 'run.py'
-  run_target(
-    'run',
-    command: [
-      python_exe,
-      run_script,
-      serial_port_option,
-      '--rfp-cli', rfp_cli,
-      '--log-file', meson.current_build_dir() / 'uart.log',
-      '--no-deploy',
-      '--display',
-    ],
-  )
-
-  run_target(
-    'run-capture',
-    command: [
-      python_exe,
-      run_script,
-      serial_port_option,
-      '--rfp-cli', rfp_cli,
-      '--log-file', meson.current_build_dir() / 'uart.log',
-    ],
-  )
 elif machine_name == 'rx65n'
-  rfp_cli = find_program('rfp-cli')
+  rfp_cli = find_program('rfp-cli', required: false)
   python_exe = find_program('python3', 'python', required: true)
   serial_port_option = get_option('serial_port')
 
@@ -114,34 +123,53 @@ elif machine_name == 'rx65n'
     build_by_default: true,
   )
 
-  if serial_port_option == ''
-    error('serial_port option must be specified for RX65N run target. Use -Dserial_port=<port>')
-  endif
+  machine_boot_firmwares = [boot_bank1_srec, boot_bank0_srec]
 
-  run_script = meson.project_source_root() / 'machines' / 'rx65n' / 'scripts' / 'run.py'
-  foreach run_name : ['run', 'run-capture']
-    run_args = [
-      python_exe,
-      run_script,
-      serial_port_option,
-      '--rfp-cli', rfp_cli,
-      '--log-file', meson.current_build_dir() / 'uart.log',
-      '--no-deploy',
-    ]
-    if run_name == 'run'
-      run_args += ['--display']
-    endif
-    run_target(run_name, command: run_args)
-  endforeach
+  if rfp_cli.found() and serial_port_option != ''
+    run_script = meson.project_source_root() / 'machines' / 'rx65n' / 'scripts' / 'run.py'
+    foreach run_name : ['run', 'run-capture']
+      run_args = [
+        python_exe,
+        run_script,
+        serial_port_option,
+        '--rfp-cli', rfp_cli,
+        '--log-file', meson.current_build_dir() / 'uart.log',
+        '--no-deploy',
+      ]
+      if run_name == 'run'
+        run_args += ['--display']
+      endif
+      run_target(run_name, command: run_args)
+    endforeach
+  endif
 elif machine_name == 'msp432e4'
   dslite = find_program('dslite', required: false)
   python_exe = find_program('python3', 'python', required: true)
   serial_port_option = get_option('serial_port')
+  boot_srec = custom_target(
+    'boot_srec',
+    input: boot_exe,
+    output: boot_exe.name() + '.srec',
+    command: [objcopy, '-O', 'srec', '@INPUT@', '@OUTPUT@'],
+    build_by_default: true,
+  )
+  boot_bank1_srec = custom_target(
+    'boot_bank1_srec',
+    input: boot_exe,
+    output: 'boot_bank1.srec',
+    command: [
+      objcopy,
+      '-O', 'srec',
+      '--adjust-vma=0x00080000',
+      '@INPUT@',
+      '@OUTPUT@',
+    ],
+    build_by_default: true,
+  )
+  machine_boot_firmwares = [boot_srec, boot_bank1_srec]
   if serial_port_option == ''
-    serial_port_option = 'COM5'
-  endif
-
-  if dslite.found()
+    warning('serial_port option not specified. Use -Dserial_port=<port>')
+  elif dslite.found()
     ccxml = files('../../machines/msp432e4/scripts/MSP432E401Y.ccxml')
     run_script = files('../../machines/msp432e4/scripts/run.py')
 
@@ -153,7 +181,6 @@ elif machine_name == 'msp432e4'
         serial_port_option,
         '--dslite', dslite,
         '--ccxml', ccxml,
-        '--firmware', boot_exe,
         '--log-file', meson.current_build_dir() / 'uart.log',
         '--no-deploy',
       ],
@@ -166,7 +193,6 @@ elif machine_name == 'msp432e4'
         serial_port_option,
         '--dslite', dslite,
         '--ccxml', ccxml,
-        '--firmware', boot_exe,
         '--log-file', meson.current_build_dir() / 'uart.log',
         '--no-deploy',
       ],

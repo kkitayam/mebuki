@@ -5,6 +5,17 @@ endif
 machine_name = 'msp432e4'
 machine_slot0_address = '0x00020000'
 machine_slot1_address = '0x000A0000'
+dslite = find_program('dslite', required: false)
+machine_run_script = meson.project_source_root() / 'machines' / 'msp432e4' / 'scripts' / 'run.py'
+machine_run_tool_args = []
+if dslite.found()
+  machine_run_tool_args = [
+    '--dslite', dslite,
+    '--ccxml', files('scripts/MSP432E401Y.ccxml'),
+  ]
+endif
+machine_run_available = dslite.found()
+machine_needs_serial = true
 
 machine_hal_sources = files(
   'hal/uart.c',

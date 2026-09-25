@@ -50,285 +50,80 @@ endif
 
 subdir('usecases')
 
-if machine_name == 'renode-cm4'
-  python_exe = find_program('python3', 'python', required: true)
-  renode = find_program('renode', required: false)
-  run_script = meson.project_source_root() / 'machines' / 'renode-cm4' / 'scripts' / 'run.py'
+python_exe = find_program('python3', 'python', required: true)
+serial_port = get_option('serial_port')
+can_run = machine_run_available
+if machine_needs_serial and serial_port == ''
+  warning('serial_port not specified. Use -Dserial_port=<port>')
+  can_run = false
+endif
 
-  if not renode.found()
-    warning('renode not found. Renode use case run targets will look for it at runtime.')
-  endif
-
+if can_run
   foreach usecase : all_usecases
-    cmd = [
-      python_exe,
-      run_script,
-      '--boot-image', boot_exe.full_path(),
-      '--build-dir', meson.current_build_dir(),
-      '--display',
-    ]
-
-    if renode.found()
-      cmd += ['--renode', renode]
-    endif
+    firmwares = []
+    depends = usecase['depends']
+    foreach firmware : machine_boot_firmwares
+      firmwares += ['--firmware', firmware]
+      depends += [firmware]
+    endforeach
 
     if usecase['has_slot0']
-      cmd += ['--slot0-image', usecase['slot0'].full_path()]
-      cmd += ['--slot0-address', machine_slot0_address]
+      slot0_srec = custom_target(
+        usecase['name'] + '_slot0_srec',
+        input: usecase['slot0'],
+        output: usecase['name'] + '_slot0.srec',
+        command: [
+          objcopy,
+          '-I', 'binary',
+          '-O', 'srec',
+          '--adjust-vma=' + machine_slot0_address,
+          '@INPUT@',
+          '@OUTPUT@',
+        ],
+      )
+      firmwares += ['--firmware', slot0_srec]
+      depends += [slot0_srec]
     endif
 
     if usecase['has_slot1']
-      cmd += ['--slot1-image', usecase['slot1'].full_path()]
-      cmd += ['--slot1-address', machine_slot1_address]
+      slot1_srec = custom_target(
+        usecase['name'] + '_slot1_srec',
+        input: usecase['slot1'],
+        output: usecase['name'] + '_slot1.srec',
+        command: [
+          objcopy,
+          '-I', 'binary',
+          '-O', 'srec',
+          '--adjust-vma=' + machine_slot1_address,
+          '@INPUT@',
+          '@OUTPUT@',
+        ],
+      )
+      firmwares += ['--firmware', slot1_srec]
+      depends += [slot1_srec]
     endif
+
+    extra = []
     if usecase['name'] == 'ota'
-      cmd += [
-        '--ymodem-image', app_images[2][0].full_path(),
+      extra = [
+        '--ymodem-image', app_images[2][0],
         '--duration', '30',
       ]
     endif
 
+    cmd = [python_exe, machine_run_script]
+    if machine_needs_serial
+      cmd += [serial_port]
+    endif
+    cmd += machine_run_tool_args + firmwares + [
+      '--log-file', meson.current_build_dir() / ('uart_' + usecase['name'] + '.log'),
+      '--display',
+    ] + extra
+
     run_target(
       'run_' + usecase['name'],
       command: cmd,
-      depends: usecase['depends'],
+      depends: depends,
     )
   endforeach
-elif machine_name == 'rx261'
-  rfp_cli = find_program('rfp-cli', required: false)
-
-  if rfp_cli.found()
-    python_exe = find_program('python3', 'python', required: true)
-    serial_port_option = get_option('serial_port')
-
-    if serial_port_option == ''
-      warning('serial_port option not specified. RX261 use case run targets will not be functional.')
-    else
-      run_script = meson.project_source_root() / 'machines' / 'rx261' / 'scripts' / 'run.py'
-
-      foreach usecase : all_usecases
-        firmware_command = ['--firmware', boot_srec]
-        depends = usecase['depends']
-        if usecase['has_slot0']
-          slot0_srec = custom_target(
-            usecase['name'] + '_slot0_srec',
-            input: usecase['slot0'],
-            output: usecase['name'] + '_slot0.srec',
-            command: [
-              objcopy,
-              '-I', 'binary',
-              '-O', 'srec',
-              '--adjust-vma=' + machine_slot0_address,
-              '@INPUT@',
-              '@OUTPUT@',
-            ],
-          )
-          firmware_command += ['--firmware', slot0_srec]
-          depends += [slot0_srec]
-        endif
-        if usecase['has_slot1']
-          slot1_srec = custom_target(
-            usecase['name'] + '_slot1_srec',
-            input: usecase['slot1'],
-            output: usecase['name'] + '_slot1.srec',
-            command: [
-              objcopy,
-              '-I', 'binary',
-              '-O', 'srec',
-              '--adjust-vma=' + machine_slot1_address,
-              '@INPUT@',
-              '@OUTPUT@',
-            ],
-          )
-          firmware_command += ['--firmware', slot1_srec]
-          depends += [slot1_srec]
-        endif
-        cmd = [
-          python_exe,
-          run_script,
-          serial_port_option,
-          '--rfp-cli', rfp_cli,
-          '--log-file', meson.current_build_dir() / ('uart_' + usecase['name'] + '.log'),
-          '--display',
-        ] + firmware_command
-        if usecase['name'] == 'ota'
-          cmd += [
-            '--ymodem-image', app_images[2][0].full_path(),
-            '--duration', '30',
-          ]
-        endif
-
-        run_target(
-          'run_' + usecase['name'],
-          command: cmd,
-          depends: depends,
-        )
-      endforeach
-    endif
-  else
-    message('rfp-cli not found. RX261 use case run targets will not be available.')
-  endif
-elif machine_name == 'rx65n'
-  rfp_cli = find_program('rfp-cli', required: false)
-
-  if rfp_cli.found()
-    python_exe = find_program('python3', 'python', required: true)
-    serial_port_option = get_option('serial_port')
-
-    if serial_port_option == ''
-      warning('serial_port option not specified. RX65N use case run targets will not be functional.')
-    else
-      run_script = meson.project_source_root() / 'machines' / 'rx65n' / 'scripts' / 'run.py'
-
-      foreach usecase : all_usecases
-        firmware_command = ['--firmware', boot_bank1_srec, '--firmware', boot_bank0_srec]
-        depends = usecase['depends']
-        if usecase['has_slot0']
-          slot0_srec = custom_target(
-            usecase['name'] + '_slot0_srec',
-            input: usecase['slot0'],
-            output: usecase['name'] + '_slot0.srec',
-            command: [
-              objcopy,
-              '-I', 'binary',
-              '-O', 'srec',
-              '--adjust-vma=' + machine_slot0_address,
-              '@INPUT@',
-              '@OUTPUT@',
-            ],
-          )
-          firmware_command += ['--firmware', slot0_srec]
-          depends += [slot0_srec]
-        endif
-        if usecase['has_slot1']
-          slot1_srec = custom_target(
-            usecase['name'] + '_slot1_srec',
-            input: usecase['slot1'],
-            output: usecase['name'] + '_slot1.srec',
-            command: [
-              objcopy,
-              '-I', 'binary',
-              '-O', 'srec',
-              '--adjust-vma=' + machine_slot1_address,
-              '@INPUT@',
-              '@OUTPUT@',
-            ],
-          )
-          firmware_command += ['--firmware', slot1_srec]
-          depends += [slot1_srec]
-        endif
-        cmd = [
-          python_exe,
-          run_script,
-          serial_port_option,
-          '--rfp-cli', rfp_cli,
-          '--log-file', meson.current_build_dir() / ('uart_' + usecase['name'] + '.log'),
-          '--display',
-        ] + firmware_command
-        if usecase['name'] == 'ota'
-          cmd += [
-            '--ymodem-image', app_images[2][0].full_path(),
-            '--duration', '30',
-          ]
-        endif
-
-        run_target(
-          'run_' + usecase['name'],
-          command: cmd,
-          depends: depends,
-        )
-      endforeach
-    endif
-  else
-    message('rfp-cli not found. RX65N use case run targets will not be available.')
-  endif
-elif machine_name == 'msp432e4'
-  dslite = find_program('dslite', required: false)
-  python_exe = find_program('python3', 'python', required: true)
-  serial_port_option = get_option('serial_port')
-  if serial_port_option == ''
-    serial_port_option = 'COM5'
-  endif
-
-  if dslite.found()
-    ccxml = files('../machines/msp432e4/scripts/MSP432E401Y.ccxml')
-    run_script = files('../machines/msp432e4/scripts/run.py')
-    boot_bank1_srec = custom_target(
-      'boot_bank1_srec',
-      input: boot_exe,
-      output: 'boot_bank1.srec',
-      command: [
-        objcopy,
-        '-O', 'srec',
-        '--adjust-vma=0x00080000',
-        '@INPUT@',
-        '@OUTPUT@',
-      ],
-    )
-
-    foreach usecase : all_usecases
-      if usecase['name'] == 'slot0' or usecase['name'] == 'higher_version' or usecase['name'] == 'keygen_mix' or usecase['name'] == 'ota'
-        slot0_srec = custom_target(
-          usecase['name'] + '_slot0_srec',
-          input: usecase['slot0'],
-          output: usecase['name'] + '_slot0.srec',
-          command: [
-            objcopy,
-            '-I', 'binary',
-            '-O', 'srec',
-            '--adjust-vma=' + machine_slot0_address,
-            '@INPUT@',
-            '@OUTPUT@',
-          ],
-        )
-        firmware_command = [
-          '--firmware', boot_exe,
-          '--firmware', boot_bank1_srec,
-          '--firmware', slot0_srec,
-        ]
-        depends = usecase['depends'] + [boot_bank1_srec, slot0_srec]
-        if usecase['has_slot1']
-          slot1_srec = custom_target(
-            usecase['name'] + '_slot1_srec',
-            input: usecase['slot1'],
-            output: usecase['name'] + '_slot1.srec',
-            command: [
-              objcopy,
-              '-I', 'binary',
-              '-O', 'srec',
-              '--adjust-vma=' + machine_slot1_address,
-              '@INPUT@',
-              '@OUTPUT@',
-            ],
-          )
-          firmware_command += ['--firmware', slot1_srec]
-          depends += [slot1_srec]
-        endif
-        extra_args = []
-        if usecase['name'] == 'ota'
-          extra_args = [
-            '--ymodem-image', app_images[2][0],
-            '--expect', 'hello world',
-          ]
-        else
-          extra_args = ['--expect', 'hello world']
-        endif
-        run_target(
-          'run_' + usecase['name'],
-          command: [
-            python_exe,
-            run_script,
-            serial_port_option,
-            '--dslite', dslite,
-            '--ccxml', ccxml,
-          ] + firmware_command + [
-            '--log-file', meson.current_build_dir() / ('uart_' + usecase['name'] + '.log'),
-          ] + extra_args,
-          depends: depends,
-        )
-      endif
-    endforeach
-  else
-    warning('dslite not found. MSP432E4 use case run targets are unavailable.')
-  endif
 endif

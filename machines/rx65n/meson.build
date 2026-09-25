@@ -9,6 +9,11 @@ endif
 machine_name = 'rx65n'
 machine_slot0_address = '0xFFE00000'
 machine_slot1_address = '0xFFF00000'
+rfp_cli = find_program('rfp-cli', required: false)
+machine_run_script = meson.project_source_root() / 'machines' / 'rx65n' / 'scripts' / 'run.py'
+machine_run_tool_args = rfp_cli.found() ? ['--rfp-cli', rfp_cli] : []
+machine_run_available = rfp_cli.found()
+machine_needs_serial = true
 
 machine_hal_sources = files(
   'hal/uart.c',
