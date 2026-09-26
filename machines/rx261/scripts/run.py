@@ -80,7 +80,6 @@ class SerialLogCapture:
         serial_port: str,
         log_file: Path,
         duration: int = 5,
-        display: bool = False,
         expected: str | None = None,
     ):
         """
@@ -90,7 +89,6 @@ class SerialLogCapture:
             serial_port: Serial port name (e.g., COM3, /dev/ttyUSB0)
             log_file: Path for log file output
             duration: Log capture duration in seconds
-            display: If True, also print logs to stdout
         """
         self.serial_port = serial_port
         self.log_file = log_file
@@ -98,7 +96,6 @@ class SerialLogCapture:
         self.expected = expected
         self.serial = None
         self.rfp_process = None
-        self.display = display
         self.pending_uart = bytearray()
         self.captured_uart = bytearray()
 
@@ -210,9 +207,8 @@ class SerialLogCapture:
         log_file.write(data)
         log_file.flush()
         self.captured_uart.extend(data)
-        if self.display:
-            sys.stdout.write(data.decode("utf-8", errors="replace"))
-            sys.stdout.flush()
+        sys.stdout.write(data.decode("utf-8", errors="replace"))
+        sys.stdout.flush()
         return data
 
     def wait_for_marker(self, log_file, marker: bytes, timeout: float) -> bool:
@@ -360,11 +356,6 @@ def main() -> int:
         help="Log capture duration in seconds (default: 5)"
     )
     parser.add_argument(
-        "--display",
-        action="store_true",
-        help="Display UART logs to stdout in addition to saving to file"
-    )
-    parser.add_argument(
         "--expect",
         help="Require this text in the captured UART output",
     )
@@ -379,7 +370,6 @@ def main() -> int:
         args.serial_port,
         args.log_file,
         args.duration,
-        args.display,
         args.expect,
     )
 

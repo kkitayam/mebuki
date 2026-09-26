@@ -117,7 +117,6 @@ if can_run
     endif
     cmd += machine_run_tool_args + firmwares + [
       '--log-file', meson.current_build_dir() / ('uart_' + usecase['name'] + '.log'),
-      '--display',
     ] + extra
 
     run_target(

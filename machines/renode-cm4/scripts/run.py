@@ -136,10 +136,9 @@ def wait_for_uart_socket(port: int, timeout_s: float = SOCKET_WAIT_TIMEOUT_S) ->
 class UartReader:
     """Read UART bytes on a background thread and write them to a file."""
 
-    def __init__(self, sock: socket.socket, log_file: IO[bytes], display: bool) -> None:
+    def __init__(self, sock: socket.socket, log_file: IO[bytes]) -> None:
         self._sock = sock
         self._log_file = log_file
-        self._display = display
         self._stop = threading.Event()
         self._error: Optional[BaseException] = None
         self._received = bytearray()
@@ -227,15 +226,14 @@ class UartReader:
                     self._captured.extend(data)
                     self._received_condition.notify_all()
 
-                if self._display:
-                    try:
-                        text = data.decode("utf-8", errors="replace")
-                        sys.stdout.write(text)
-                        sys.stdout.flush()
-                    except OSError as exc:
-                        self._error = exc
-                        logger.error("Failed to write UART output to stdout: %s", exc)
-                        return
+                try:
+                    text = data.decode("utf-8", errors="replace")
+                    sys.stdout.write(text)
+                    sys.stdout.flush()
+                except OSError as exc:
+                    self._error = exc
+                    logger.error("Failed to write UART output to stdout: %s", exc)
+                    return
         except BaseException as exc:
             self._error = exc
             logger.error("UART reader failed: %s", exc)
@@ -299,7 +297,6 @@ def run_renode(
     socket_port: int,
     log_file_path: Path,
     duration_s: int,
-    display: bool,
     ymodem_image: Optional[Path] = None,
     expected: Optional[str] = None,
 ) -> int:
@@ -354,7 +351,7 @@ def run_renode(
             logger.error("%s", exc)
             return 1
 
-        reader = UartReader(uart_sock, uart_log, display)
+        reader = UartReader(uart_sock, uart_log)
         reader.start()
 
         try:
@@ -455,11 +452,6 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     parser.add_argument("--log-file", required=True, type=Path, help="Path for UART log output"    )
     parser.add_argument("--renode", help="Path to the Renode executable")
     parser.add_argument(
-        "--display",
-        action="store_true",
-        help="Display UART logs to stdout in addition to saving to file",
-    )
-    parser.add_argument(
         "--duration",
         type=int,
         default=DEFAULT_DURATION_S,
@@ -543,7 +535,6 @@ def main(argv: Optional[list[str]] = None) -> int:
             socket_port,
             args.log_file,
             args.duration,
-            args.display,
             ymodem_image=ymodem_image,
             expected=args.expect,
         )

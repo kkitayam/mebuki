@@ -52,65 +52,34 @@ boot_bin = custom_target(
   build_by_default: false,
 )
 
-if machine_name == 'renode-cm4'
-  boot_srec = custom_target(
-    'boot_srec',
-    input: boot_exe,
-    output: boot_exe.name() + '.srec',
-    command: [objcopy, '-O', 'srec', '@INPUT@', '@OUTPUT@'],
-    build_by_default: true,
-  )
-  machine_boot_firmwares = [boot_srec]
-elif machine_name == 'rx261'
-  boot_srec = custom_target(
-    'boot_srec',
-    input: boot_exe,
-    output: boot_exe.name() + '.srec',
-    command: [objcopy, '-O', 'srec', '@INPUT@', '@OUTPUT@'],
-    build_by_default: true,
-  )
+boot_srec = custom_target(
+  'boot_srec',
+  input: boot_exe,
+  output: boot_exe.name() + '.srec',
+  command: [objcopy, '-O', 'srec', '@INPUT@', '@OUTPUT@'],
+  build_by_default: true,
+)
+machine_boot_firmwares = [boot_srec]
 
-  machine_boot_firmwares = [boot_srec]
-elif machine_name == 'rx65n'
+if machine_name == 'rx65n'
   boot_bank1_srec = custom_target(
     'boot_bank1_srec',
     input: boot_exe,
     output: 'boot_bank1.srec',
-    command: [objcopy, '-O', 'srec', '@INPUT@', '@OUTPUT@'],
-    build_by_default: true,
-  )
-
-  boot_bank0_srec = custom_target(
-    'boot_bank0_srec',
-    input: boot_exe,
-    output: 'boot_bank0.srec',
     command: [objcopy, '--change-addresses', '-0x100000', '-O', 'srec', '@INPUT@', '@OUTPUT@'],
     build_by_default: true,
   )
 
-  machine_boot_firmwares = [boot_bank1_srec, boot_bank0_srec]
+  machine_boot_firmwares += [boot_bank1_srec]
 elif machine_name == 'msp432e4'
-  boot_srec = custom_target(
-    'boot_srec',
-    input: boot_exe,
-    output: boot_exe.name() + '.srec',
-    command: [objcopy, '-O', 'srec', '@INPUT@', '@OUTPUT@'],
-    build_by_default: true,
-  )
   boot_bank1_srec = custom_target(
     'boot_bank1_srec',
     input: boot_exe,
     output: 'boot_bank1.srec',
-    command: [
-      objcopy,
-      '-O', 'srec',
-      '--adjust-vma=0x00080000',
-      '@INPUT@',
-      '@OUTPUT@',
-    ],
+    command: [objcopy, '--change-addresses', '0x80000', '-O', 'srec', '@INPUT@', '@OUTPUT@'],
     build_by_default: true,
   )
-  machine_boot_firmwares = [boot_srec, boot_bank1_srec]
+  machine_boot_firmwares += [boot_bank1_srec]
 endif
 
 python_exe = find_program('python3', 'python', required: true)
@@ -134,12 +103,7 @@ if can_run
     command += [
       '--log-file', meson.current_build_dir() / ('uart_' + run_name + '.log'),
     ]
-    if machine_needs_serial
-      command += ['--no-deploy']
-    endif
-    if run_name == 'run'
-      command += ['--display']
-    endif
+    command += machine_boot_run_args
 
     run_target(run_name, command: command, depends: machine_boot_firmwares)
   endforeach

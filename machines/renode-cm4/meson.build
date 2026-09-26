@@ -8,6 +8,7 @@ machine_slot0_address = '0x00020000'
 machine_slot1_address = '0x00040000'
 machine_run_script = meson.project_source_root() / 'machines' / 'renode-cm4' / 'scripts' / 'run.py'
 machine_run_tool_args = []
+machine_boot_run_args = []
 machine_run_available = true
 machine_needs_serial = false
 

@@ -8,6 +8,7 @@ machine_slot1_address = '0x000A0000'
 dslite = find_program('dslite', required: false)
 machine_run_script = meson.project_source_root() / 'machines' / 'msp432e4' / 'scripts' / 'run.py'
 machine_run_tool_args = []
+machine_boot_run_args = ['--no-deploy']
 if dslite.found()
   machine_run_tool_args = [
     '--dslite', dslite,
