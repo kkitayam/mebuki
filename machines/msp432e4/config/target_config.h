@@ -19,4 +19,10 @@
 #define SLOT1_BASE          0x000A0000U
 #define SLOT1_SIZE          0x00040000U
 
+#define HAS_BANK_SWAP
+#define HAS_INSTANT_BANK_SWAP
+#define BANK_SWAP_HEADER            "msp432e401y_flash.h"
+#define BANK_SWAP()                 msp432_flash_swap_bank()
+#define BANK_SWAP_ADJUST_ENTRY(ep)  (MBK_SLOT0_BASE + MBK_HEADER_SIZE)
+
 #endif

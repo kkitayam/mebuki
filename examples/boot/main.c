@@ -11,12 +11,8 @@
 #include "mebuki.h"
 #include "taneue.h"
 
-#ifdef MEBUKI_BOOT_USE_BANK_SWAP
-#ifdef MEBUKI_BOOT_USE_MSP432E4_BANK_SWAP
-#include "msp432e401y_flash.h"
-#else
-#include "flash_type4.h"
-#endif
+#ifdef HAS_BANK_SWAP
+#include BANK_SWAP_HEADER
 #endif
 
 void uart_printf(const char* fmt, ...)
@@ -119,7 +115,7 @@ int main(void)
     uart_puts("Boot Software (mebuki)\r\n");
     uart_puts("==================================================\r\n");
 
-#ifndef MEBUKI_BOOT_USE_BANK_SWAP
+#ifndef HAS_BANK_SWAP
     uart_puts("swap slots if needed...\r\n");
     cnt = get_cycle_count();
     enum taneue_result err = taneue_swap_if_scheduled();
@@ -188,32 +184,30 @@ int main(void)
     dump((const uint8_t*)MBK_DATA1_BASE, (const uint8_t*)MBK_DATA1_BASE + 64);
 #endif
     if (boot_info.slot_id == 1) {
-        /* The application software is built to run from slot0, so a swap is necessary when booting from slot1 */
-        uart_puts("Scheduling slot swap...\r\n");
-#ifdef MEBUKI_BOOT_USE_BANK_SWAP
-#ifdef MEBUKI_BOOT_USE_MSP432E4_BANK_SWAP
-        int swap_result = msp432_flash_swap_bank();
-#else
-        int swap_result = flash_type4_swap_bank();
-#endif
+        /* The application software is built to run from slot0, so a swap is necessary when booting from slot1. */
+#ifdef HAS_BANK_SWAP
+        uart_puts("Performing bank swap...\r\n");
+        int swap_result = BANK_SWAP();
         if (swap_result != 0) {
             put_error_code("ERROR: Failed to swap flash bank (code: ", swap_result);
             halt();
         }
-#ifdef MEBUKI_BOOT_USE_MSP432E4_BANK_SWAP
+#ifdef HAS_INSTANT_BANK_SWAP
         uart_puts("Flash bank swapped\r\n");
-        handoff_entry = MBK_SLOT0_BASE + MBK_HEADER_SIZE;
+        handoff_entry = BANK_SWAP_ADJUST_ENTRY(boot_info.entry_point);
+#else
+        uart_puts("Slot swap scheduled\r\n");
+        system_reset();
 #endif
 #else
+        uart_puts("Scheduling slot swap...\r\n");
         enum taneue_result result = taneue_schedule_swap();
         if (result != TANEUE_SUCCESS) {
             put_error_code("ERROR: Failed to schedule slot swap (code: ", (int)result);
             halt();
         }
-#endif
         uart_puts("Slot swap scheduled\r\n");
-#ifndef MEBUKI_BOOT_USE_MSP432E4_BANK_SWAP
-        system_reset();  /* swap operation is deferred until the next boot */
+        system_reset();
 #endif
     }
 

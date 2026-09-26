@@ -24,4 +24,8 @@
 #define SLOT1_BASE          0xFFF00000U
 #define SLOT1_SIZE          0x00020000U
 
+#define HAS_BANK_SWAP
+#define BANK_SWAP_HEADER    "flash_type4.h"
+#define BANK_SWAP()         flash_type4_swap_bank()
+
 #endif
