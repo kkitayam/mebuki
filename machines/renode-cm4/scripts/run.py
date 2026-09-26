@@ -83,6 +83,55 @@ def require_file(path: Path, description: str) -> Path:
     return path.resolve()
 
 
+def read_vector_table(image: Path) -> tuple[int, int]:
+    """Read the initial stack pointer and reset vector from an S-record image."""
+    vector_bytes: dict[int, int] = {}
+
+    try:
+        lines = image.read_text(encoding="ascii").splitlines()
+    except (OSError, UnicodeError) as exc:
+        raise RuntimeError(f"Failed to read firmware image {image}: {exc}") from exc
+
+    for line_number, line in enumerate(lines, start=1):
+        if not line:
+            continue
+        if len(line) < 4 or line[0] != "S" or not line[1].isdigit():
+            raise RuntimeError(f"Invalid S-record at {image}:{line_number}")
+
+        try:
+            record_type = int(line[1])
+            record = bytes.fromhex(line[2:])
+        except ValueError as exc:
+            raise RuntimeError(f"Invalid S-record at {image}:{line_number}") from exc
+
+        if not record or record[0] != len(record) - 1:
+            raise RuntimeError(f"Invalid S-record length at {image}:{line_number}")
+        if (sum(record) & 0xFF) != 0xFF:
+            raise RuntimeError(f"Invalid S-record checksum at {image}:{line_number}")
+
+        address_size = {1: 2, 2: 3, 3: 4}.get(record_type)
+        if address_size is None:
+            continue
+
+        address = int.from_bytes(record[1:1 + address_size], "big")
+        data = record[1 + address_size:-1]
+        for offset, value in enumerate(data):
+            vector_bytes[address + offset] = value
+
+    try:
+        initial_sp = int.from_bytes(
+            bytes(vector_bytes[address] for address in range(0, 4)),
+            "little",
+        )
+        reset_vector = int.from_bytes(
+            bytes(vector_bytes[address] for address in range(4, 8)),
+            "little",
+        )
+        return initial_sp, reset_vector
+    except KeyError as exc:
+        raise RuntimeError(f"Firmware image has no complete vector table: {image}") from exc
+
+
 def generate_resc(
     resc_path_out: Path,
     repl: Path,
@@ -297,6 +346,8 @@ def run_renode(
     socket_port: int,
     log_file_path: Path,
     duration_s: int,
+    initial_sp: int,
+    reset_vector: int,
     ymodem_image: Optional[Path] = None,
     expected: Optional[str] = None,
 ) -> int:
@@ -355,6 +406,8 @@ def run_renode(
         reader.start()
 
         try:
+            send_monitor_command(proc, f"cpu SP 0x{initial_sp:X}")
+            send_monitor_command(proc, f"cpu PC 0x{reset_vector:X}")
             send_monitor_command(proc, "start")
         except (OSError, RuntimeError) as exc:
             logger.error("Failed to start the CPU: %s", exc)
@@ -512,6 +565,7 @@ def main(argv: Optional[list[str]] = None) -> int:
 
         try:
             args.log_file.parent.mkdir(parents=True, exist_ok=True)
+            initial_sp, reset_vector = read_vector_table(firmware[0])
             fd, resc_name = tempfile.mkstemp(
                 prefix="usecase_",
                 suffix=".resc",
@@ -525,7 +579,7 @@ def main(argv: Optional[list[str]] = None) -> int:
                 firmware,
                 socket_port,
             )
-        except RuntimeError as exc:
+        except (OSError, RuntimeError) as exc:
             logger.error("%s", exc)
             return 1
 
@@ -535,6 +589,8 @@ def main(argv: Optional[list[str]] = None) -> int:
             socket_port,
             args.log_file,
             args.duration,
+            initial_sp,
+            reset_vector,
             ymodem_image=ymodem_image,
             expected=args.expect,
         )
