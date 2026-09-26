@@ -62,10 +62,6 @@ if machine_name == 'renode-cm4'
   )
   machine_boot_firmwares = [boot_srec]
 elif machine_name == 'rx261'
-  rfp_cli = find_program('rfp-cli', required: false)
-  python_exe = find_program('python3', 'python', required: true)
-  serial_port_option = get_option('serial_port')
-
   boot_srec = custom_target(
     'boot_srec',
     input: boot_exe,
@@ -75,38 +71,7 @@ elif machine_name == 'rx261'
   )
 
   machine_boot_firmwares = [boot_srec]
-
-  if rfp_cli.found() and serial_port_option != ''
-    run_script = meson.project_source_root() / 'machines' / 'rx261' / 'scripts' / 'run.py'
-    run_target(
-      'run',
-      command: [
-        python_exe,
-        run_script,
-        serial_port_option,
-        '--rfp-cli', rfp_cli,
-        '--log-file', meson.current_build_dir() / 'uart.log',
-        '--no-deploy',
-        '--display',
-      ],
-    )
-
-    run_target(
-      'run-capture',
-      command: [
-        python_exe,
-        run_script,
-        serial_port_option,
-        '--rfp-cli', rfp_cli,
-        '--log-file', meson.current_build_dir() / 'uart.log',
-      ],
-    )
-  endif
 elif machine_name == 'rx65n'
-  rfp_cli = find_program('rfp-cli', required: false)
-  python_exe = find_program('python3', 'python', required: true)
-  serial_port_option = get_option('serial_port')
-
   boot_bank1_srec = custom_target(
     'boot_bank1_srec',
     input: boot_exe,
@@ -124,28 +89,7 @@ elif machine_name == 'rx65n'
   )
 
   machine_boot_firmwares = [boot_bank1_srec, boot_bank0_srec]
-
-  if rfp_cli.found() and serial_port_option != ''
-    run_script = meson.project_source_root() / 'machines' / 'rx65n' / 'scripts' / 'run.py'
-    foreach run_name : ['run', 'run-capture']
-      run_args = [
-        python_exe,
-        run_script,
-        serial_port_option,
-        '--rfp-cli', rfp_cli,
-        '--log-file', meson.current_build_dir() / 'uart.log',
-        '--no-deploy',
-      ]
-      if run_name == 'run'
-        run_args += ['--display']
-      endif
-      run_target(run_name, command: run_args)
-    endforeach
-  endif
 elif machine_name == 'msp432e4'
-  dslite = find_program('dslite', required: false)
-  python_exe = find_program('python3', 'python', required: true)
-  serial_port_option = get_option('serial_port')
   boot_srec = custom_target(
     'boot_srec',
     input: boot_exe,
@@ -167,39 +111,38 @@ elif machine_name == 'msp432e4'
     build_by_default: true,
   )
   machine_boot_firmwares = [boot_srec, boot_bank1_srec]
-  if serial_port_option == ''
-    warning('serial_port option not specified. Use -Dserial_port=<port>')
-  elif dslite.found()
-    ccxml = files('../../machines/msp432e4/scripts/MSP432E401Y.ccxml')
-    run_script = files('../../machines/msp432e4/scripts/run.py')
+endif
 
-    run_target(
-      'run',
-      command: [
-        python_exe,
-        run_script,
-        serial_port_option,
-        '--dslite', dslite,
-        '--ccxml', ccxml,
-        '--log-file', meson.current_build_dir() / 'uart.log',
-        '--no-deploy',
-      ],
-    )
-    run_target(
-      'run-capture',
-      command: [
-        python_exe,
-        run_script,
-        serial_port_option,
-        '--dslite', dslite,
-        '--ccxml', ccxml,
-        '--log-file', meson.current_build_dir() / 'uart.log',
-        '--no-deploy',
-      ],
-    )
-  else
-    warning('dslite not found. MSP432E4 deploy targets are unavailable.')
-  endif
+python_exe = find_program('python3', 'python', required: true)
+serial_port = get_option('serial_port')
+can_run = machine_run_available
+if machine_needs_serial and serial_port == ''
+  warning('serial_port not specified. Use -Dserial_port=<port>')
+  can_run = false
+endif
+
+if can_run
+  foreach run_name : ['run', 'run-capture']
+    command = [python_exe, machine_run_script]
+    if machine_needs_serial
+      command += [serial_port]
+    endif
+    command += machine_run_tool_args
+    foreach firmware : machine_boot_firmwares
+      command += ['--firmware', firmware]
+    endforeach
+    command += [
+      '--log-file', meson.current_build_dir() / ('uart_' + run_name + '.log'),
+    ]
+    if machine_needs_serial
+      command += ['--no-deploy']
+    endif
+    if run_name == 'run'
+      command += ['--display']
+    endif
+
+    run_target(run_name, command: command, depends: machine_boot_firmwares)
+  endforeach
 endif
 
 run_target(
