@@ -103,6 +103,7 @@ static void dump(const void* beg, const void* end)
 int main(void)
 {
     uint32_t cnt;
+    int err;
 
 #ifndef MSP432E4_STARTUP_INITIALIZES_SYSTEM
     system_init();
@@ -118,9 +119,9 @@ int main(void)
 #ifndef HAS_BANK_SWAP
     uart_puts("swap slots if needed...\r\n");
     cnt = get_cycle_count();
-    enum taneue_result err = taneue_swap_if_scheduled();
-    if (err != TANEUE_SUCCESS) {
-        put_error_code("ERROR: Failed to perform scheduled slot swap (code: ", (int)err);
+    err = taneue_swap_if_scheduled();
+    if (err < 0) {
+        put_error_code("ERROR: Failed to perform scheduled slot swap (code: ", err);
         halt();
     }
     put_count("TANEUE: ", get_cycle_count() - cnt);
@@ -129,10 +130,10 @@ int main(void)
     uart_puts("Initializing mebuki...\r\n");
 
     struct mbk_context ctx;
-    enum mbk_result result = mbk_init(&ctx);
+    err = mbk_init(&ctx);
 
-    if (result != MBK_SUCCESS) {
-        put_error_code("ERROR: mbk_init failed (code: ", (int)result);
+    if (err < 0) {
+        put_error_code("ERROR: mbk_init failed (code: ", err);
         halt();
     }
 
@@ -140,9 +141,9 @@ int main(void)
 
     struct mbk_boot_info boot_info;
     cnt = get_cycle_count();
-    result = mbk_find_bootable_slot(&ctx, &boot_info);
-    if (result != MBK_SUCCESS) {
-        put_error_code("ERROR: No bootable slot found (code: ", (int)result);
+    err = mbk_find_bootable_slot(&ctx, &boot_info);
+    if (err < 0) {
+        put_error_code("ERROR: No bootable slot found (code: ", err);
         halt();
     }
     put_count("MEBUKI: ", get_cycle_count() - cnt);
@@ -170,7 +171,6 @@ int main(void)
 
     uart_puts("  Entry Point: 0x");
     uint32_t entry = boot_info.entry_point;
-    uint32_t handoff_entry = entry;
     put_hex(entry, true);
     uart_puts("\r\n");
 
@@ -185,34 +185,26 @@ int main(void)
 #endif
     if (boot_info.slot_id == 1) {
         /* The application software is built to run from slot0, so a swap is necessary when booting from slot1. */
-#ifdef HAS_BANK_SWAP
-        uart_puts("Performing bank swap...\r\n");
-        int swap_result = BANK_SWAP();
-        if (swap_result != 0) {
-            put_error_code("ERROR: Failed to swap flash bank (code: ", swap_result);
-            halt();
-        }
-#ifdef HAS_INSTANT_BANK_SWAP
-        uart_puts("Flash bank swapped\r\n");
-        handoff_entry = BANK_SWAP_ADJUST_ENTRY(boot_info.entry_point);
-#else
-        uart_puts("Slot swap scheduled\r\n");
-        system_reset();
-#endif
-#else
         uart_puts("Scheduling slot swap...\r\n");
-        enum taneue_result result = taneue_schedule_swap();
-        if (result != TANEUE_SUCCESS) {
-            put_error_code("ERROR: Failed to schedule slot swap (code: ", (int)result);
+#ifdef HAS_BANK_SWAP
+        err = BANK_SWAP();
+#else
+        err = taneue_schedule_swap();
+#endif
+        if (err < 0) {
+            put_error_code("ERROR: Failed to schedule slot swap (code: ", err);
             halt();
         }
         uart_puts("Slot swap scheduled\r\n");
+#ifdef HAS_INSTANT_BANK_SWAP
+        entry = BANK_SWAP_ADJUST_ENTRY(boot_info.entry_point);
+#else
         system_reset();
 #endif
     }
 
     prepare_handoff();
-    jump_to_firmware(handoff_entry);
+    jump_to_firmware(entry);
 
     /* unreachable */
     halt();
