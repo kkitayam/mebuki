@@ -83,7 +83,7 @@ def require_file(path: Path, description: str) -> Path:
     return path.resolve()
 
 
-def read_vector_table(image: Path) -> tuple[int, int]:
+def read_vector_table(image: Path, base: int = 0) -> tuple[int, int]:
     """Read the initial stack pointer and reset vector from an S-record image."""
     vector_bytes: dict[int, int] = {}
 
@@ -120,11 +120,11 @@ def read_vector_table(image: Path) -> tuple[int, int]:
 
     try:
         initial_sp = int.from_bytes(
-            bytes(vector_bytes[address] for address in range(0, 4)),
+            bytes(vector_bytes[address] for address in range(base, base + 4)),
             "little",
         )
         reset_vector = int.from_bytes(
-            bytes(vector_bytes[address] for address in range(4, 8)),
+            bytes(vector_bytes[address] for address in range(base + 4, base + 8)),
             "little",
         )
         return initial_sp, reset_vector
@@ -137,6 +137,8 @@ def generate_resc(
     repl: Path,
     firmware: list[Path],
     socket_port: int,
+    vector_base: int = 0,
+    uart: str = "uart0",
 ) -> None:
     """Write a temporary Renode script. Do not start the CPU."""
     lines = [
@@ -144,13 +146,14 @@ def generate_resc(
         "mach create",
         f"machine LoadPlatformDescription {resc_path(repl)}",
         "cpu FpuEnabled true",
+        *([f"cpu VectorTableOffset 0x{vector_base:X}"] if vector_base else []),
         *[f"sysbus LoadSRecord {resc_path(image)}" for image in firmware],
     ]
 
     lines.extend(
         [
             f'emulation CreateServerSocketTerminal {socket_port} "uart" false',
-            "connector Connect sysbus.uart0 uart",
+            f"connector Connect sysbus.{uart} uart",
         ]
     )
 
@@ -235,14 +238,29 @@ class UartReader:
                 self._received_condition.wait(remaining)
             return marker in self._received
 
+    def discard_through(self, marker: bytes) -> None:
+        """Discard output through a previously observed marker."""
+        with self._received_condition:
+            position = self._received.find(marker)
+            if position < 0:
+                raise RuntimeError(f"UART marker was not found: {marker!r}")
+            del self._received[:position + len(marker)]
+
     @property
     def failed(self) -> bool:
         """True if the reader stopped due to an error."""
         return self._error is not None
 
-    def contains(self, text: str) -> bool:
-        """Return whether the captured UART output contains text."""
-        return text.encode() in self._captured
+    def contains_in_order(self, markers: list[str]) -> bool:
+        """Return whether all markers appear in order in the captured output."""
+        position = 0
+        for marker in markers:
+            encoded = marker.encode()
+            position = self._captured.find(encoded, position)
+            if position < 0:
+                return False
+            position += len(encoded)
+        return True
 
     @property
     def error(self) -> Optional[BaseException]:
@@ -349,7 +367,7 @@ def run_renode(
     initial_sp: int,
     reset_vector: int,
     ymodem_image: Optional[Path] = None,
-    expected: Optional[str] = None,
+    expected: Optional[list[str]] = None,
 ) -> int:
     """Start Renode, capture UART, then stop and clean up."""
     uart_log_path = log_file_path
@@ -414,9 +432,11 @@ def run_renode(
             return 1
 
         if ymodem_image is not None:
-            if not reader.wait_for(b"APP_OTA: waiting for YMODEM image...", 20.0):
+            banner = b"APP_OTA: waiting for YMODEM image..."
+            if not reader.wait_for(banner, 20.0):
                 logger.error("OTA receiver banner was not observed")
                 return 1
+            reader.discard_through(banner)
             try:
                 image_data = ymodem_image.read_bytes()
             except OSError as exc:
@@ -447,8 +467,8 @@ def run_renode(
         if reader.failed:
             logger.error("UART reader failed: %s", reader.error)
             return 1
-        if expected is not None and not reader.contains(expected):
-            logger.error("Expected UART text was not received: %s", expected)
+        if expected is not None and not reader.contains_in_order(expected):
+            logger.error("Expected UART sequence was not received: %s", expected)
             return 1
         return 0
 
@@ -504,13 +524,18 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     )
     parser.add_argument("--log-file", required=True, type=Path, help="Path for UART log output"    )
     parser.add_argument("--renode", help="Path to the Renode executable")
+    parser.add_argument("--vector-base", type=lambda value: int(value, 0), default=0,
+                        help="Address of the boot vector table")
+    parser.add_argument("--uart", choices=["uart0", "usart3"], default="uart0",
+                        help="Renode UART peripheral name")
     parser.add_argument(
         "--duration",
         type=int,
         default=DEFAULT_DURATION_S,
         help=f"Run duration in seconds (default: {DEFAULT_DURATION_S})",
     )
-    parser.add_argument("--expect", help="Require this text in the captured UART output")
+    parser.add_argument("--expect", action="append",
+                        help="Require this text in UART output, in argument order")
     parser.add_argument(
         "--repl",
         default=str(DEFAULT_REPL),
@@ -529,6 +554,9 @@ def main(argv: Optional[list[str]] = None) -> int:
     try:
         if args.duration < 0:
             logger.error("Duration must be non-negative")
+            return 1
+        if args.vector_base < 0 or args.vector_base > 0xFFFFFFF8:
+            logger.error("Invalid vector table address")
             return 1
 
         if not args.firmware:
@@ -565,7 +593,7 @@ def main(argv: Optional[list[str]] = None) -> int:
 
         try:
             args.log_file.parent.mkdir(parents=True, exist_ok=True)
-            initial_sp, reset_vector = read_vector_table(firmware[0])
+            initial_sp, reset_vector = read_vector_table(firmware[0], args.vector_base)
             fd, resc_name = tempfile.mkstemp(
                 prefix="usecase_",
                 suffix=".resc",
@@ -578,6 +606,8 @@ def main(argv: Optional[list[str]] = None) -> int:
                 repl,
                 firmware,
                 socket_port,
+                args.vector_base,
+                args.uart,
             )
         except (OSError, RuntimeError) as exc:
             logger.error("%s", exc)

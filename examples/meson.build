@@ -3,7 +3,7 @@ if not sign_algorithms.has_key(verification)
   error('Unsupported SVL: @0@'.format(verification))
 endif
 
-if machine_name != 'renode-cm4' and machine_name != 'rx261' and machine_name != 'rx65n' and machine_name != 'msp432e4'
+if machine_name != 'renode-cm4' and machine_name != 'renode-nucleo_h753zi' and machine_name != 'rx261' and machine_name != 'rx65n' and machine_name != 'msp432e4'
   error('Unsupported machine for examples: @0@'.format(machine_name))
 endif
 
@@ -44,7 +44,7 @@ sign_algo = sign_algorithms[verification]
 
 subdir('boot')
 subdir('app')
-if machine_name == 'renode-cm4' or machine_name == 'rx261' or machine_name == 'rx65n' or machine_name == 'msp432e4'
+if machine_name == 'renode-cm4' or machine_name == 'renode-nucleo_h753zi' or machine_name == 'rx261' or machine_name == 'rx65n' or machine_name == 'msp432e4'
   subdir('app_ota')
 endif
 
@@ -109,6 +109,24 @@ if can_run
         '--ymodem-image', app_images[2][0],
         '--duration', '30',
       ]
+    endif
+    if machine_name == 'renode-nucleo_h753zi'
+      if usecase['name'] == 'boot_only'
+        extra += ['--expect', 'ERROR: No bootable slot found (code: -2)']
+      elif usecase['name'] == 'slot0'
+        extra += ['--expect', 'Slot ID: 0', '--expect', 'hello world']
+      elif usecase['name'] == 'keygen_mix'
+        extra += ['--expect', 'Slot ID: 0', '--expect', 'Key Generation: 0x1',
+                  '--expect', 'hello world']
+      elif usecase['name'] == 'higher_version'
+        extra += ['--expect', 'Slot ID: 1', '--expect', 'Security Version: 0x2',
+                  '--expect', 'Slot swap scheduled', '--expect', 'Slot ID: 0',
+                  '--expect', 'Security Version: 0x2', '--expect', 'hello world']
+      elif usecase['name'] == 'ota'
+        extra += ['--expect', 'APP_OTA: receive OK', '--expect', 'Slot ID: 1',
+                  '--expect', 'Slot swap scheduled', '--expect', 'Slot ID: 0',
+                  '--expect', 'Security Version: 0x2', '--expect', 'hello world']
+      endif
     endif
 
     cmd = [python_exe, machine_run_script]

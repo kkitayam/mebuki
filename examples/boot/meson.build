@@ -67,12 +67,12 @@ if machine_name == 'rx65n'
   )
 
   machine_boot_firmwares += [boot_bank1_srec]
-elif machine_name == 'msp432e4'
+elif machine_name == 'msp432e4' or machine_name == 'renode-nucleo_h753zi'
   boot_bank1_srec = custom_target(
     'boot_bank1_srec',
     input: boot_exe,
     output: 'boot_bank1.srec',
-    command: [objcopy, '--change-addresses', '0x80000', '-O', 'srec', '@INPUT@', '@OUTPUT@'],
+    command: [objcopy, '--change-addresses', machine_name == 'msp432e4' ? '0x80000' : '0x100000', '-O', 'srec', '@INPUT@', '@OUTPUT@'],
     build_by_default: true,
   )
   machine_boot_firmwares += [boot_bank1_srec]

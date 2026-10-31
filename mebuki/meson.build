@@ -1,7 +1,7 @@
 mbk_includes = include_directories('include')
 
 mbk_sources = files('src/mebuki.c')
-if get_option('target') != 'rx65n'
+if get_option('target') != 'rx65n' and get_option('target') != 'renode-nucleo_h753zi'
   mbk_sources += files('src/taneue.c')
 endif
 

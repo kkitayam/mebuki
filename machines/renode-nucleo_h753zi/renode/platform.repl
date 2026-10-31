@@ -1,0 +1,17 @@
+using "platforms/boards/nucleo_h753zi.repl"
+
+flashController: @ none
+itcm: @ none
+
+flashBank1: @ { sysbus 0x08000000; sysbus 0x00000000 }
+    ResetByte: 0xFF
+
+flashBank2:
+    ResetByte: 0xFF
+
+swappableFlash: MTD.H753SwappableFlashController @ sysbus 0x52002000
+    flash1: flashBank1
+    flash2: flashBank2
+    -> nvic@4
+    preinit:
+        include @H753SwappableFlashController.cs

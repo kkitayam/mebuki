@@ -15,4 +15,6 @@ elif target_option == 'rx65n'
   subdir('rx65n')
 elif target_option == 'msp432e4'
   subdir('msp432e4')
+elif target_option == 'renode-nucleo_h753zi'
+  subdir('renode-nucleo_h753zi')
 endif

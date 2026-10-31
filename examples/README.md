@@ -32,6 +32,8 @@ Deploy and run logic lives in machine definitions.
 ### Supported Machines
 
 - **renode-cm4**: All use cases supported. Run targets start the Renode simulator.
+- **renode-nucleo_h753zi**: All use cases run on Renode's Nucleo H753ZI
+  platform, with a local flash bank-swap model.
 - **rx261** and **rx65n**: All use cases supported. Run targets deploy images
   via rfp-cli and run them on hardware through the configured serial port.
 - **msp432e4**: Use cases supported through dslite and the configured serial
@@ -58,6 +60,27 @@ For Renode (CM4):
 ```powershell
 meson setup builddir --cross-file cross/arm-none-eabi-gcc.ini -Dtarget=renode-cm4
 ```
+
+For Renode Nucleo H753ZI:
+
+```powershell
+uv run meson setup build-renode-h753zi --cross-file cross\arm-none-eabi-cortex-m7.ini `
+    -Dtarget=renode-nucleo_h753zi
+uv run meson compile -C build-renode-h753zi run_boot_only run_slot0 `
+    run_higher_version run_keygen_mix run_ota
+```
+
+The H753ZI run targets check the expected UART messages in order. To test bank
+mapping, reset persistence, erase targeting, and the saved security version:
+
+```powershell
+uv run python -m unittest discover -s machines\renode-nucleo_h753zi\tests -v
+uv run python machines\renode-nucleo_h753zi\tests\check_boot_state.py build-renode-h753zi
+uv run meson compile -C build-renode-h753zi test_h753_flash_hal test_h753_flash_errors
+```
+
+Run `run_higher_version` before `check_boot_state.py` to generate its input
+images. The model tests require Renode on `PATH`.
 
 For RX261 or RX65N hardware:
 
